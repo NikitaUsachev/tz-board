@@ -175,7 +175,7 @@ function getCookie(n){var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;
 function saveMe(nm){meMem=nm;ls.set("tz-me",nm);try{sessionStorage.setItem("tz-me",nm)}catch(e){}try{document.cookie="tz-me="+encodeURIComponent(nm)+"; path=/; max-age=31536000; SameSite=Lax"}catch(e){}}
 function storedMe(){var v=meMem||ls.get("tz-me");if(!v){try{v=sessionStorage.getItem("tz-me")}catch(e){}}if(!v)v=getCookie("tz-me");if(v&&!meMem)meMem=v;return v||""}
 function myName(){return isAdmin?(storedMe()||myEmail().split("@")[0]):storedMe()}
-function shortName(n){var p=String(n||"").trim().split(/\s+/);return p.length>1?p[0]+" "+p[1].charAt(0)+".":p[0]||""}
+function shortName(n){var p=String(n||"").trim().split(/\s+/);var f=p[0]?p[0].charAt(0).toUpperCase()+p[0].slice(1):"";return p.length>1?f+" "+p[1].charAt(0).toUpperCase()+".":f}
 function fmtWhen(at){var d=new Date(at);if(isNaN(d))return "";var t=d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});var today=new Date();return d.toDateString()===today.toDateString()?t:d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" "+t}
 function setCheck(evid,item,done){
  var prev=checks[item];if(done)checks[item]={by:myName(),at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";render();
@@ -308,7 +308,8 @@ function markSeen(ev){ls.set("tz-seen-"+ev.id,{v:versions[ev.id],d:snapEv(ev),at
 function deptsFor(evid){var s=ls.get("tz-dept-"+evid);if(s&&s.length)return s;var hd=hashDept();return hd?[hd]:DEPTS.map(function(c){return c.id})}
 function setDepts(evid,arr){ls.set("tz-dept-"+evid,arr)}
 function collapsed(evid){return ls.get("tz-col-"+evid)||{}}
-function itemLabel(i){return (i.name||"").trim()+(String(i.qty||"").trim()?" ×"+String(i.qty).trim():"")}
+function qtyStr(q){q=String(q||"").trim();if(!q)return "";return /^\d+([.,]\d+)?$/.test(q)?q+" шт.":q}
+function itemLabel(i){return (i.name||"").trim()+(String(i.qty||"").trim()?" — "+qtyStr(i.qty):"")}
 function blk(ev,h,c){var b=ev&&ev.blocks&&ev.blocks[h]&&ev.blocks[h][c];return b||{items:[],note:"",files:[],links:[]}}
 function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x});return m}
 function computeDiff(o,n){
@@ -464,7 +465,7 @@ function catRead(ev,hid,c,done,col){
  var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stageRead(b,k):"";
  if(!items.length&&!plots&&!spec&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
-  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'')+'</label>'}).join("")+'</div>':'')+staff+
+  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'')+'</label>'}).join("")+'</div>':'')+staff+
   ((b.note||"").trim()?'<p class="cat-note'+(curMarks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
 }
 function staffEdit(hid,c,b){var st=b.staff||[],at=function(i){return ' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"'};
@@ -490,7 +491,7 @@ function catEdit(ev,hid,c){
   b.items.map(function(it,i){var k=hid+"-"+c.id+"-"+it.id;
    var last=b.items.length-1,at=' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"';
    return '<div class="erow" data-erow="'+hid+'|'+c.id+'|'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="n-'+k+'" data-f="item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="name" list="dl-'+c.id+'" value="'+esc(it.name)+'" placeholder="Оборудование / задача" aria-label="Позиция">'+
-   '<input id="q-'+k+'" data-f="item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="qty" value="'+esc(it.qty)+'" placeholder="Кол-во" aria-label="Количество">'+
+   '<input id="q-'+k+'" data-f="item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="qty" value="'+esc(it.qty)+'" placeholder="шт." aria-label="Количество">'+
    '<button class="rm" data-act="rm-item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" aria-label="Удалить позицию">×</button>'+
    '<input id="c-'+k+'" class="cm-in" data-f="item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="note" value="'+esc(it.note)+'" placeholder="Комментарий (необязательно)" aria-label="Комментарий">'+
    '<span class="mv"><button data-act="mv-up"'+at+(i===0?" disabled":"")+' aria-label="Переместить выше" title="Выше">↑</button><button data-act="mv-down"'+at+(i===last?" disabled":"")+' aria-label="Переместить ниже" title="Ниже">↓</button></span></div>'}).join("")+
