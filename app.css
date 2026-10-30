@@ -337,3 +337,19 @@ a.tel:hover{text-decoration:underline}
 :root[data-theme="dark"]{--extra:#A3B1C4}
 .cat-extra{--c:var(--extra);grid-column:1/-1}
 .counts .c-extra::before{background:var(--extra)}
+/* ---------- stage block ---------- */
+:root{--stage:#9A3F5C}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--stage:#F08FAE}}
+:root[data-theme="dark"]{--stage:#F08FAE}
+.cat-stage{--c:var(--stage);grid-column:1/-1}
+.counts .c-stage::before{background:var(--stage)}
+.stage-spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.stage-spec .ss{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line);min-width:0}
+.stage-spec .ss b{font-weight:600;overflow-wrap:anywhere}
+.stage-spec .ss-mk{background:none;border:0;justify-content:center}
+.stage-spec.mk-changed .ss{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.stage-edit{display:grid;align-items:end;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.stage-edit .se{display:flex;flex-direction:column;gap:4px;min-width:0}
+.stage-edit .se-wide{grid-column:span 2}
+@media (max-width:420px){.stage-edit .se-wide{grid-column:1/-1}}
+.stage-edit input,.stage-edit select{min-width:0;width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface)}
