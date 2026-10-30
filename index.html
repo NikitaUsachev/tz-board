@@ -250,7 +250,9 @@ function isPast(d){if(!d)return false;var t=new Date();t.setHours(0,0,0,0);retur
 function route(){var h=location.hash.slice(1);return h.indexOf("ev-")===0?h.slice(3):null}
 function go(id){if(id){location.hash="ev-"+id}else{if(location.hash){history.pushState(null,"",location.pathname+location.search)}render()}}
 function linkFor(id){return location.origin+location.pathname+"#ev-"+id}
+function adminLink(){return location.origin+location.pathname+"?admin"}
 function myEmail(){return session&&session.user&&session.user.email||""}
+var adminEntry=(function(){var q=/[?&]admin(=|&|$)/.test(location.search);if(q)ls.set("tz-admin-entry",1);return q||!!ls.get("tz-admin-entry")})();
 
 /* ---------- data ---------- */
 function loadAll(){
@@ -322,7 +324,7 @@ function copyText(text){
 function topBar(){
  var mode=session?(isAdmin?'<span class="mode admin">Администратор</span>':'<span class="mode">Только просмотр</span>'):'';
  var onBoard=!route();
- var auth=session?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(myEmail().split("@")[0])+' · Выйти</button>':'<button class="btn ghost sm" data-act="login">Вход для администраторов</button>';
+ var auth=session?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(myEmail().split("@")[0])+' · Выйти</button>':(adminEntry?'<button class="btn ghost sm" data-act="login">Вход для администраторов</button>':'');
  return '<header class="top"><div class="top-in gut">'+
   '<div class="brand"><h1>ТЗ на мероприятия</h1>'+mode+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
@@ -465,7 +467,7 @@ function modalView(){
    (modal.err?'<p class="hint" style="color:var(--danger)">'+esc(modal.err)+'</p>':'')+
    '<div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="close">Отмена</button><button type="submit" class="btn primary"'+(modal.sending?" disabled":"")+'>'+(modal.sending?"Отправляем…":"Получить ссылку")+'</button></div></form>',"Вход");
  }
- if(modal.t==="account")return wrap('<h2>Аккаунт</h2><p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+(isAdmin?'':'<p class="hint">Этого адреса нет в списке администраторов, поэтому доступен только просмотр. Попросите администратора добавить вас в «Настройках».</p>')+
+ if(modal.t==="account")return wrap('<h2>Аккаунт</h2><p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+(isAdmin?'<p class="hint">Ссылка для входа администраторов: <b class="mono" style="overflow-wrap:anywhere">'+esc(adminLink())+'</b></p>':'<p class="hint">Этого адреса нет в списке администраторов, поэтому доступен только просмотр. Попросите администратора добавить вас в «Настройках».</p>')+
   '<div class="bar"><span class="sp"></span><button class="btn" data-act="close">Закрыть</button><button class="btn danger" data-act="logout">Выйти</button></div>',"Аккаунт");
  if(modal.t==="settings"){
   var hs=modal.halls;
@@ -478,7 +480,7 @@ function modalView(){
    '<h4>Администраторы</h4><div style="display:flex;flex-direction:column;gap:6px">'+admins.map(function(a){var me=a.toLowerCase()===myEmail().toLowerCase();
     return '<div class="hl"><span style="flex:1;min-width:0;overflow-wrap:anywhere">'+esc(a)+'</span>'+(me?'<span class="use">это вы</span>':'<button class="btn ghost sm danger" data-act="rm-admin" data-email="'+esc(a)+'" aria-label="Убрать администратора">×</button>')+'</div>'}).join("")+'</div>'+
    '<form id="admin-form" class="hl"><input id="admin-email" type="email" required placeholder="email нового администратора"><button type="submit" class="btn sm">Добавить</button></form>'+
-   '<p class="hint">Новый администратор входит по кнопке «Вход для администраторов» со своим email.</p>'+
+   '<p class="hint">Новый администратор открывает ссылку <b class="mono" style="overflow-wrap:anywhere">'+esc(adminLink())+'</b> и входит со своим email. Техникам эту ссылку не отправляйте.</p>'+
    '<div class="bar"><span class="sp"></span><button class="btn" data-act="close">Закрыть</button></div>',"Настройки");
  }
  return "";
@@ -561,7 +563,7 @@ app.addEventListener("submit",function(e){
  if(e.target.id==="login-form"){
   var em=document.getElementById("login-email").value.trim();if(!em)return;
   ls.set("tz-email",em);modal.email=em;modal.sending=true;modal.err="";render();
-  sb.auth.signInWithOtp({email:em,options:{emailRedirectTo:location.origin+location.pathname}}).then(function(r){
+  sb.auth.signInWithOtp({email:em,options:{emailRedirectTo:adminLink()}}).then(function(r){
    modal.sending=false;
    if(r.error){modal.err=/rate|limit/i.test(r.error.message)?"Слишком много писем за короткое время. Подождите немного и попробуйте снова.":r.error.message;}
    else modal.sent=true;
@@ -619,6 +621,7 @@ window.addEventListener("hashchange",function(){
 });
 
 /* ---------- boot ---------- */
+if(/[?&]admin/.test(location.search)){try{history.replaceState(null,"",location.pathname+location.hash)}catch(_){}}
 render();
 loadAll();
 sb.auth.getSession().then(function(r){session=r.data&&r.data.session||null;
