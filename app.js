@@ -47,12 +47,11 @@ function phoneHtml(p){var h=telHref(p);return (p||"").trim()?(h?'<a class="tel" 
 var COVERS=["","Ковролин","Линолеум","Другое"];
 function num(v){return String(v||"").trim().replace(".",",")}
 function specLines(sp){if(!sp)return [];var out=[],w=num(sp.w),d=num(sp.d),h=num(sp.h);
- if(w||d)out.push(["Ширина × глубина",(w||"?")+" × "+(d||"?")+" м"]);
- if(h)out.push(["Высота",h+" м"]);
- if(sp.cover||(sp.coverNote||"").trim())out.push(["Покрытие",[sp.cover,(sp.coverNote||"").trim()].filter(Boolean).join(", ")]);
- if(sp.raus==="yes"||(sp.rausNote||"").trim())out.push(["Раус",sp.raus==="yes"?("Есть"+((sp.rausNote||"").trim()?", "+sp.rausNote.trim():"")):sp.rausNote.trim()]);
+ if(w||d||h)out.push([h?"Сцена: ширина × глубина × высота":"Сцена: ширина × глубина",(w||"?")+" × "+(d||"?")+(h?" × "+h:"")+" м","size"]);
+ if(sp.cover||(sp.coverNote||"").trim())out.push(["Покрытие",[sp.cover,(sp.coverNote||"").trim()].filter(Boolean).join(", "),"cover"]);
+ if(sp.raus==="yes"||(sp.rausNote||"").trim())out.push(["Раус",sp.raus==="yes"?("Есть"+((sp.rausNote||"").trim()?", "+sp.rausNote.trim():"")):sp.rausNote.trim(),"raus"]);
  var sf=num(sp.stepsFront),ss=num(sp.stepsSide);
- if(sf||ss)out.push(["Ступени",[sf?"фронтальные: "+sf:"",ss?"боковые: "+ss:""].filter(Boolean).join(" · ")]);
+ if(sf||ss)out.push(["Ступени",[sf?"фронтальные: "+sf+" шт.":"",ss?"боковые: "+ss+" шт.":""].filter(Boolean).join(" · "),"steps"]);
  return out}
 function specStr(sp){return specLines(sp).map(function(x){return x[0]+": "+x[1]}).join("; ")}
 function blockCount(b){return b?b.items.filter(function(i){return (i.name||"").trim()}).length+(b.files||[]).filter(function(f){return f.path}).length+(b.links||[]).filter(function(l){return (l.url||"").trim()}).length:0}
@@ -203,7 +202,7 @@ function checkAdmin(){
  });
 }
 function loadAdmins(){return sb.from("admins").select("email").order("email").then(function(r){admins=(r.data||[]).map(function(x){return x.email})})}
-function cleanEvent(ev){var e=clone(ev);delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});if(!Object.keys(b.spec).length)delete b.spec}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
+function cleanEvent(ev){var e=clone(ev);delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});var sk=Object.keys(b.spec).filter(function(k){return k!=="id"});if(!sk.length)delete b.spec;else if(!b.spec.id)b.spec.id=uid()}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
 function fail(e,prefix){busy=false;showSaving(false);toast((prefix||"Не удалось сохранить")+": "+((e&&e.message)||"ошибка сети"));return false}
 
 function saveEvent(ev,isNew,force){
@@ -455,14 +454,17 @@ function chiefRead(b,k){if(!hasChief(b))return "";var m=curMarks["chief|"+k];
 function staffRead(b){var st=staffOf(b);if(!st.length)return "";
  return '<div class="staff"><span class="eyebrow">Персонал</span>'+st.map(function(p){var m=curMarks[p.id];
   return '<div class="person'+(m?" mk-"+m:"")+'"><span class="p-role">'+esc(p.role||"—")+'</span><span class="p-name">'+esc(p.name||"—")+badge(p.id)+'</span>'+phoneHtml(p.phone)+'</div>'}).join("")+'</div>'}
-function stageRead(b,k){var L=specLines(b.spec);if(!L.length)return "";var m=curMarks["spec|"+k];
- return '<div class="stage-spec'+(m?" mk-changed":"")+'">'+L.map(function(x){return '<div class="ss"><span class="eyebrow">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>'}).join("")+'</div>'}
+function specTasks(b){var sp=b&&b.spec;if(!sp||!sp.id)return [];return specLines(sp).map(function(x){return sp.id+":"+x[2]})}
+function stageRead(b,k,evid){var L=specLines(b.spec);if(!L.length)return "";var m=curMarks["spec|"+k],sid=b.spec.id;
+ return '<div class="stage-spec'+(m?" mk-changed":"")+'">'+L.map(function(x){var tid=sid?sid+":"+x[2]:"",c=tid&&checks[tid];
+  var inner='<span class="eyebrow">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b>'+(c?'<span class="who">✓ '+esc(shortName(c.by)||"отмечено")+(c.at?' · '+esc(fmtWhen(c.at)):'')+'</span>':'');
+  return tid?'<label class="ss ss-chk'+(c?" done":"")+'"><input type="checkbox" data-done="'+esc(evid)+'|'+esc(tid)+'"'+(c?" checked":"")+'><span class="ss-b">'+inner+'</span></label>':'<div class="ss">'+inner+'</div>'}).join("")+'</div>'}
 function catRead(ev,hid,c,done,col){
  col=col||{};var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
  var k=hid+"|"+c.id,cc=!!col[k],n=blockCount(b),ch=markCount(ev,k);
- var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed" title="Новые и изменённые пункты">'+ch+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}),dn=its.filter(function(i){return checks[i.id]}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
+ var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed" title="Новые и изменённые пункты">'+ch+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}).map(function(i){return {id:i.id}}).concat(specTasks(b).map(function(t){return {id:t}})),dn=its.filter(function(i){return checks[i.id]}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
  if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+'</div>';
- var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stageRead(b,k):"";
+ var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stageRead(b,k,ev.id):"";
  if(!items.length&&!plots&&!spec&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
   return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'')+'</label>'}).join("")+'</div>':'')+staff+
