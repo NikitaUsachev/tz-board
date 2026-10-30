@@ -31,7 +31,7 @@ function themeBtn(){var d=curTheme()==="dark";return '<button class="btn ghost s
 function hallById(id){for(var i=0;i<state.halls.length;i++)if(state.halls[i].id===id)return state.halls[i];return null}
 function evById(id){for(var i=0;i<state.events.length;i++)if(state.events[i].id===id)return state.events[i];return null}
 function stName(id){for(var i=0;i<STATUSES.length;i++)if(STATUSES[i].id===id)return STATUSES[i].name;return id}
-function evHalls(ev){return (ev.halls||[]).map(hallById).filter(Boolean)}
+function evHalls(ev){return state.halls.filter(function(h){return (ev.halls||[]).indexOf(h.id)>=0})}
 function emptyBlocks(){var b={};CATS.forEach(function(c){b[c.id]={items:[],note:""}});return b}
 function ensureBlocks(ev){ev.blocks=ev.blocks||{};(ev.halls||[]).forEach(function(h){if(!ev.blocks[h])ev.blocks[h]=emptyBlocks();CATS.forEach(function(c){if(!ev.blocks[h][c.id])ev.blocks[h][c.id]={items:[],note:""}})});return ev}
 function blockCount(b){return b?b.items.filter(function(i){return (i.name||"").trim()}).length+(b.files||[]).filter(function(f){return f.path}).length+(b.links||[]).filter(function(l){return (l.url||"").trim()}).length:0}
@@ -357,14 +357,16 @@ function modalView(){
   var hs=modal.halls;
   return wrap('<h2>Настройки</h2>'+
    '<h4>Залы</h4><div style="display:flex;flex-direction:column;gap:6px">'+hs.map(function(h,i){var used=state.events.filter(function(e){return (e.halls||[]).indexOf(h.id)>=0}).length;
-    return '<div class="hl"><input id="hall-'+h.id+'" data-hallname="'+i+'" value="'+esc(h.name)+'" aria-label="Название зала"><span class="use">'+(used?"в "+used+" ТЗ":"")+'</span><button class="btn ghost sm danger" data-act="rm-hall" data-i="'+i+'" aria-label="Удалить зал">×</button></div>'}).join("")+
+    return '<div class="hl hrow" data-hrow="'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="hall-'+h.id+'" data-hallname="'+i+'" value="'+esc(h.name)+'" aria-label="Название зала"><span class="use">'+(used?"в "+used+" ТЗ":"")+'</span>'+
+     '<span class="mv"><button data-act="mv-hall" data-i="'+i+'" data-to="'+(i-1)+'"'+(i===0?" disabled":"")+' aria-label="Переместить выше" title="Выше">↑</button><button data-act="mv-hall" data-i="'+i+'" data-to="'+(i+1)+'"'+(i===hs.length-1?" disabled":"")+' aria-label="Переместить ниже" title="Ниже">↓</button></span>'+
+     '<button class="btn ghost sm danger" data-act="rm-hall" data-i="'+i+'" aria-label="Удалить зал">×</button></div>'}).join("")+
    '</div><button class="btn sm" data-act="add-hall" style="align-self:flex-start">+ Добавить зал</button>'+
    '<p class="hint">Переименование зала обновит его во всех ТЗ. Если удалить зал, его блоки скроются из ТЗ.</p>'+
    '<div class="bar"><span class="sp"></span><button class="btn primary" data-act="save-settings">Сохранить залы</button></div>'+
    '<h4>Администраторы</h4><div style="display:flex;flex-direction:column;gap:6px">'+admins.map(function(a){var me=a.toLowerCase()===myEmail().toLowerCase();
     return '<div class="hl"><span style="flex:1;min-width:0;overflow-wrap:anywhere">'+esc(a)+'</span>'+(me?'<span class="use">это вы</span>':'<button class="btn ghost sm danger" data-act="rm-admin" data-email="'+esc(a)+'" aria-label="Убрать администратора">×</button>')+'</div>'}).join("")+'</div>'+
    '<form id="admin-form" class="hl"><input id="admin-email" type="email" required placeholder="email нового администратора"><button type="submit" class="btn sm">Добавить</button></form>'+
-   '<p class="hint">Порядок такой: коллега регистрируется на <b class="mono" style="overflow-wrap:anywhere">'+esc(homeLink())+'</b> (почта и пароль или Google), а вы добавляете его email сюда. Без этого он увидит только экран ожидания.</p>'+
+   '<p class="hint">Порядок такой: коллега регистрируется на <b class="mono" style="overflow-wrap:anywhere">'+esc(homeLink())+'</b> (почта и пароль), а вы добавляете его email сюда. Без этого он увидит только экран ожидания.</p>'+
    '<div class="bar"><span class="sp"></span><button class="btn" data-act="close">Закрыть</button></div>',"Настройки");
  }
  return "";
@@ -423,6 +425,7 @@ function moveItem(h,c,from,to){
  if(to<0||to>=arr.length||from===to)return;
  var it=arr.splice(from,1)[0];arr.splice(to,0,it);dirty=true;exitArmed=false;render();
 }
+function moveHall(from,to){if(!modal||!modal.halls||to<0||to>=modal.halls.length||from===to)return;var h=modal.halls.splice(from,1)[0];modal.halls.splice(to,0,h);modal.hallsDirty=true;render()}
 function saveEditing(){
  if(busy)return;
  if(uploading(editing)){toast("Дождитесь окончания загрузки файлов");return}
@@ -477,6 +480,7 @@ app.addEventListener("click",function(e){
   case "settings":pickerOpen=false;modal={t:"settings",halls:clone(state.halls)};render();loadAdmins().then(render);break;
   case "add-hall":modal.halls.push({id:"h"+uid(),name:"Новый зал"});render();var ins=document.querySelectorAll("[data-hallname]");if(ins.length){ins[ins.length-1].focus();ins[ins.length-1].select()}break;
   case "rm-hall":modal.halls.splice(+d.i,1);render();break;
+  case "mv-hall":moveHall(+d.i,+d.to);var hb=document.querySelector('[data-act="mv-hall"][data-i="'+d.to+'"][data-to="'+(2*(+d.to)-(+d.i))+'"]');if(hb&&!hb.disabled)hb.focus();break;
   case "save-settings":var halls=modal.halls.filter(function(h){return h.name.trim()}).map(function(h){return {id:h.id,name:h.name.trim()}});
    saveHalls(halls).then(function(ok){if(ok&&modal)modal.halls=clone(state.halls);render()});break;
   case "rm-admin":sb.from("admins").delete().eq("email",d.email).then(function(r){if(r.error)toast("Не удалось: "+r.error.message);loadAdmins().then(render)});break;
@@ -550,6 +554,13 @@ app.addEventListener("dragstart",function(e){var c=e.target.closest&&e.target.cl
 app.addEventListener("dragend",function(e){var c=e.target.closest&&e.target.closest("[data-card]");if(c)c.classList.remove("dragging");document.querySelectorAll(".col.over").forEach(function(x){x.classList.remove("over")})});
 app.addEventListener("dragover",function(e){var col=e.target.closest(".col");if(!col||!dragId)return;e.preventDefault();document.querySelectorAll(".col.over").forEach(function(x){if(x!==col)x.classList.remove("over")});col.classList.add("over")});
 app.addEventListener("drop",function(e){var col=e.target.closest(".col");if(!col||!dragId)return;e.preventDefault();var id=dragId;dragId=null;col.classList.remove("over");var ev=evById(id);var st=col.dataset.col;if(ev&&ev.status!==st)setStatus(id,st)});
+
+/* drag to reorder halls in settings */
+var hallDrag=null;
+app.addEventListener("dragstart",function(e){var g=e.target.closest&&e.target.closest(".hrow .grip");if(!g)return;var row=g.closest(".hrow");hallDrag=+row.dataset.hrow;row.classList.add("dragging");try{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain","hall");e.dataTransfer.setDragImage(row,20,20)}catch(_){}});
+app.addEventListener("dragover",function(e){if(hallDrag==null)return;var row=e.target.closest(".hrow");if(!row)return;e.preventDefault();var r=row.getBoundingClientRect(),after=e.clientY>r.top+r.height/2;document.querySelectorAll(".hrow.drop-before,.hrow.drop-after").forEach(function(x){x.classList.remove("drop-before","drop-after")});row.classList.add(after?"drop-after":"drop-before")});
+app.addEventListener("drop",function(e){if(hallDrag==null)return;var row=e.target.closest(".hrow");var src=hallDrag;hallDrag=null;if(!row)return;e.preventDefault();var r=row.getBoundingClientRect(),after=e.clientY>r.top+r.height/2,tgt=+row.dataset.hrow+(after?1:0);if(tgt>src)tgt--;moveHall(src,tgt)});
+app.addEventListener("dragend",function(){hallDrag=null;document.querySelectorAll(".hrow.dragging,.hrow.drop-before,.hrow.drop-after").forEach(function(x){x.classList.remove("dragging","drop-before","drop-after")})});
 
 /* drag to reorder items inside one block */
 var itemDrag=null;
