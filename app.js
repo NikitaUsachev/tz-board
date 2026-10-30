@@ -2,10 +2,12 @@
 "use strict";
 var CFG=window.TZ_CONFIG||{};
 var STATUSES=[{id:"draft",name:"Черновик"},{id:"prep",name:"В подготовке"},{id:"ready",name:"Утверждено"},{id:"done",name:"Проведено"}];
-var CATS=[{id:"sound",name:"Звук",en:"Audio"},{id:"light",name:"Свет",en:"Light"},{id:"video",name:"Видео",en:"Video"}];
+var CATS=[{id:"sound",name:"Звук",en:"Audio"},{id:"light",name:"Свет",en:"Light"},{id:"video",name:"Видео",en:"Video"},{id:"extra",name:"Дополнительно",en:"Extra"}];
+var DEPTS=CATS.filter(function(c){return c.id!=="extra"});
 var SUGGEST={
  sound:["Радиомикрофон ручной","Радиосистема головная","Радиосистема петличная","Микрофон на стойке","Пульт FOH","Мониторы сценические","In-ear мониторинг","Линейный массив","Сабвуфер","DI-бокс","Воспроизведение с ноутбука","Звукорежиссёр"],
  light:["Заливка сцены","Wash-прибор","Beam-прибор","Spot-прибор","Профильный прожектор","Следящий прожектор","Генератор хейза","Генератор дыма","Лазерная установка","Пульт света","Художник по свету"],
+ extra:["Электропитание 380 В","Электропитание 220 В","Разводка электричества","Удлинители / пилоты","Подвес / риггинг","Ферма","Генератор","Коммутация между залами","Интернет / Wi-Fi","Связь (интерком)"],
  video:["LED-экран","Проектор","Проекционный экран","Медиасервер","Видеомикшер","Камера на трансляцию","Суфлёр-монитор","ТВ-панель","Кликер для презентаций","Видеоинженер"]
 };
 
@@ -34,7 +36,7 @@ function stName(id){for(var i=0;i<STATUSES.length;i++)if(STATUSES[i].id===id)ret
 function evHalls(ev){return state.halls.filter(function(h){return (ev.halls||[]).indexOf(h.id)>=0})}
 function emptyBlocks(){var b={};CATS.forEach(function(c){b[c.id]={items:[],note:""}});return b}
 function ensureBlocks(ev){ev.blocks=ev.blocks||{};(ev.halls||[]).forEach(function(h){if(!ev.blocks[h])ev.blocks[h]=emptyBlocks();CATS.forEach(function(c){if(!ev.blocks[h][c.id])ev.blocks[h][c.id]={items:[],note:""}})});return ev}
-var ROLES={sound:["Звукорежиссёр","Дежурный по звуку","Монтажник звука","Техник по радиосистемам"],light:["Художник по свету","Дежурный по свету","Оператор пульта","Монтажник света"],video:["Видеоинженер","Дежурный по видео","Оператор камеры","Монтажник видео"]};
+var ROLES={sound:["Звукорежиссёр","Дежурный по звуку","Монтажник звука","Техник по радиосистемам"],light:["Художник по свету","Дежурный по свету","Оператор пульта","Монтажник света"],video:["Видеоинженер","Дежурный по видео","Оператор камеры","Монтажник видео"],extra:["Электрик","Риггер","Монтажник","Дежурный электрик"]};
 function telHref(p){var d=String(p||"").replace(/[^\d+]/g,"");return d.length>=5?"tel:"+d:""}
 function personLine(p){return [(p.role||"").trim(),(p.name||"").trim(),(p.phone||"").trim()].filter(Boolean).join(" · ")}
 function hasChief(b){return !!(b&&b.chief&&((b.chief.name||"").trim()||(b.chief.phone||"").trim()))}
@@ -274,7 +276,7 @@ function cardView(e){
   '<h3>'+esc(e.title||"Без названия")+'</h3>'+
   (time?'<div class="time mono">'+esc(time)+'</div>':'')+
   (halls.length?'<div class="chips">'+halls.map(function(h){return '<span class="chip">'+esc(h.name)+'</span>'}).join("")+'</div>':'')+
-  '<div class="counts">'+CATS.map(function(c){return '<span class="c-'+c.id+'" title="'+c.name+'">'+c.name+' '+catCount(e,c.id)+'</span>'}).join("")+'</div>'+
+  '<div class="counts">'+CATS.filter(function(c){return c.id!=="extra"||catCount(e,c.id)}).map(function(c){return '<span class="c-'+c.id+'" title="'+c.name+'">'+c.name+' '+catCount(e,c.id)+'</span>'}).join("")+'</div>'+
  '</a>';
 }
 
@@ -284,7 +286,7 @@ var BASE_TITLE=document.title;
 function flagTitle(on){document.title=(on?"● ":"")+BASE_TITLE}
 function snapEv(ev){var e=cleanEvent(ev);delete e.id;return e}
 function markSeen(ev){ls.set("tz-seen-"+ev.id,{v:versions[ev.id],d:snapEv(ev),at:Date.now()})}
-function deptsFor(evid){var s=ls.get("tz-dept-"+evid);if(s&&s.length)return s;var hd=hashDept();return hd?[hd]:CATS.map(function(c){return c.id})}
+function deptsFor(evid){var s=ls.get("tz-dept-"+evid);if(s&&s.length)return s;var hd=hashDept();return hd?[hd]:DEPTS.map(function(c){return c.id})}
 function setDepts(evid,arr){ls.set("tz-dept-"+evid,arr)}
 function collapsed(evid){return ls.get("tz-col-"+evid)||{}}
 function itemLabel(i){return (i.name||"").trim()+(String(i.qty||"").trim()?" ×"+String(i.qty).trim():"")}
@@ -324,7 +326,7 @@ function techDiff(ev){if(isAdmin)return null;var seen=ls.get("tz-seen-"+ev.id);i
 function changesView(ev,diff,depts){
  if(!diff)return "";
  var lines=diff.head.map(function(t){return '<li>'+esc(t)+'</li>'}).join(""),hidden=0;
- evHalls(ev).forEach(function(h){CATS.forEach(function(c){var arr=diff.cats[h.id+"|"+c.id];if(!arr)return;
+ evHalls(ev).forEach(function(h){CATS.forEach(function(c){var arr=diff.cats[h.id+"|"+c.id];if(!arr)return;if(c.id==="extra"){lines+='<li><b>'+esc(h.name)+' · '+c.name+':</b> '+arr.map(esc).join("; ")+'</li>';return}
   if(depts.indexOf(c.id)<0){hidden+=arr.length;return}
   lines+='<li><b>'+esc(h.name)+' · '+c.name+':</b> '+arr.map(esc).join("; ")+'</li>'})});
  if(!lines&&!hidden)return "";
@@ -334,10 +336,10 @@ function changesView(ev,diff,depts){
   '<button class="btn primary sm" data-act="ack" data-id="'+esc(ev.id)+'">Понятно</button></section>';
 }
 function deptBar(ev,depts){
- var all=depts.length===CATS.length;
+ var all=depts.length===DEPTS.length;
  return '<div class="deptbar"><span class="eyebrow">Мой отдел</span><div class="seg" role="group" aria-label="Показывать отделы">'+
   '<button class="'+(all?"on":"")+'" data-act="dept" data-dept="all" aria-pressed="'+all+'">Все</button>'+
-  CATS.map(function(c){var on=!all&&depts.indexOf(c.id)>=0;return '<button class="seg-'+c.id+(on?" on":"")+'" data-act="dept" data-dept="'+c.id+'" aria-pressed="'+on+'">'+c.name+'</button>'}).join("")+
+  DEPTS.map(function(c){var on=!all&&depts.indexOf(c.id)>=0;return '<button class="seg-'+c.id+(on?" on":"")+'" data-act="dept" data-dept="'+c.id+'" aria-pressed="'+on+'">'+c.name+'</button>'}).join("")+
   '</div></div>';
 }
 function badge(id){var m=curDiff&&curDiff.marks[id];return m?'<span class="chg chg-'+m+'">'+(m==="new"?"Новое":"Изменено")+'</span>':''}
@@ -411,11 +413,11 @@ function hallsView(ev,isEdit,depts){
   if(isEdit){var tot=CATS.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
    return '<section class="hall" id="hall-'+h.id+'"><div class="hall-h"><h3>'+esc(h.name)+'</h3><span class="eyebrow">'+tot+' поз.</span></div><div class="cats">'+
    CATS.map(function(c){return catEdit(ev,h.id,c)}).join("")+'</div></section>'}
-  var cats=CATS.filter(function(c){return depts.indexOf(c.id)>=0}),col=collapsed(ev.id),hc=!!col[h.id];
+  var cats=CATS.filter(function(c){return c.id==="extra"||depts.indexOf(c.id)>=0}),col=collapsed(ev.id),hc=!!col[h.id];
   var tot2=cats.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
   var hch=curDiff&&cats.some(function(c){return curDiff.cats[h.id+"|"+c.id]});
   return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
-   (hc?'':'<div class="cats cats-'+cats.length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
+   (hc?'':'<div class="cats cats-'+cats.filter(function(c){return c.id!=="extra"}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
  }).join("")+(isEdit?'':'<p class="hint me-line">Отметки «сделано» видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
 }
 function chiefRead(b,k){if(!hasChief(b))return "";var m=curDiff&&curDiff.marks["chief|"+k];
@@ -429,7 +431,7 @@ function catRead(ev,hid,c,done,col){
  var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed">'+ch.length+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}),dn=its.filter(function(i){return checks[i.id]}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
  if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+'</div>';
  var chief=chiefRead(b,k),staff=staffRead(b);
- if(!items.length&&!plots&&!chief&&!staff&&!(b.note||"").trim())return '<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
+ if(!items.length&&!plots&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+chief+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curDiff&&curDiff.marks[it.id];
   return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'')+'</label>'}).join("")+'</div>':'')+staff+
   ((b.note||"").trim()?'<p class="cat-note'+(curDiff&&curDiff.marks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
@@ -468,7 +470,7 @@ function modalView(){
  if(!modal)return "";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
  if(modal.t==="me")return wrap('<h2>Как вас зовут?</h2><p class="hint">Имя будет видно рядом с вашими отметками «сделано», чтобы все понимали, кто что выполнил.</p><form id="me-form" class="halls-row"><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(ls.get("tz-me")||"")+'"><div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div></form>',"Ваше имя");
- if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(CATS.map(function(c){return {d:c.id,n:c.name}}));
+ if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(DEPTS.map(function(c){return {d:c.id,n:c.name}}));
   return wrap('<h2>Ссылки для техников</h2><p class="hint">Ссылка отдела сразу открывает только его блоки. Техник может переключить отдел сам.</p><div class="linkopts">'+opts.map(function(o){var u=linkFor(modal.id,o.d),iid="lk-"+(o.d||"all");
    return '<div class="linkopt"><span class="lo-n">'+esc(o.n)+'</span><input id="'+iid+'" readonly value="'+esc(u)+'" aria-label="Ссылка: '+esc(o.n)+'"><button class="btn sm" data-act="copy-one" data-url="'+esc(u)+'" data-inp="'+iid+'">Копировать</button></div>'}).join("")+'</div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылки")}
  if(modal.t==="copy")return wrap('<h2>Ссылка на ТЗ</h2><p class="hint">Скопируйте и отправьте техникам.</p><div class="copybox"><input id="copy-in" readonly value="'+esc(modal.text)+'"></div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылка");
@@ -586,11 +588,11 @@ app.addEventListener("click",function(e){
    delArmed=false;deleteEvent(d.id);break;
   case "copy":modal={t:"links",id:d.id};render();break;
   case "copy-one":var cv=d.url;if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(cv).then(function(){toast("Ссылка скопирована")},function(){var ci=document.getElementById(d.inp);if(ci){ci.focus();ci.select()}toast("Выделите ссылку и скопируйте вручную")})}else{var ci2=document.getElementById(d.inp);if(ci2){ci2.focus();ci2.select()}}break;
-  case "dept":var evd=route();if(!evd)break;var cur=deptsFor(evd),allOn=cur.length===CATS.length;
-   if(d.dept==="all")cur=CATS.map(function(c){return c.id});
+  case "dept":var evd=route();if(!evd)break;var cur=deptsFor(evd),allOn=cur.length===DEPTS.length;
+   if(d.dept==="all")cur=DEPTS.map(function(c){return c.id});
    else if(allOn)cur=[d.dept];
-   else{var ix=cur.indexOf(d.dept);if(ix>=0)cur.splice(ix,1);else cur.push(d.dept);if(!cur.length)cur=CATS.map(function(c){return c.id})}
-   cur=CATS.map(function(c){return c.id}).filter(function(x){return cur.indexOf(x)>=0});setDepts(evd,cur);render();break;
+   else{var ix=cur.indexOf(d.dept);if(ix>=0)cur.splice(ix,1);else cur.push(d.dept);if(!cur.length)cur=DEPTS.map(function(c){return c.id})}
+   cur=DEPTS.map(function(c){return c.id}).filter(function(x){return cur.indexOf(x)>=0});setDepts(evd,cur);render();break;
   case "tog":var evt=route();if(!evt)break;var cl=collapsed(evt);if(cl[d.k])delete cl[d.k];else cl[d.k]=1;ls.set("tz-col-"+evt,cl);render();break;
   case "ack":var eva=evById(d.id);if(eva){markSeen(eva);curDiff=null;flagTitle(false);render();toast("Отмечено как прочитанное")}break;
   case "jump":var evj=route(),clj=evj&&collapsed(evj);if(clj&&clj[d.h]){delete clj[d.h];ls.set("tz-col-"+evj,clj);render()}var el=document.getElementById("hall-"+d.h);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});break;

@@ -331,3 +331,9 @@ a.tel:hover{text-decoration:underline}
 .team-cell b{font-weight:600;overflow-wrap:anywhere}
 .team-cell b .none{font-weight:400}
 .team-cell input{min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface)}
+/* ---------- extra block ---------- */
+:root{--extra:#475569}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--extra:#A3B1C4}}
+:root[data-theme="dark"]{--extra:#A3B1C4}
+.cat-extra{--c:var(--extra);grid-column:1/-1}
+.counts .c-extra::before{background:var(--extra)}
