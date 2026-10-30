@@ -12,7 +12,7 @@ var SUGGEST={
 var sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:"implicit"}});
 var state={halls:[],events:[]}, versions={}, loaded=false, loadError="";
 var session=null, isAdmin=false, admins=[], authReady=false, techMsg="", auth={tab:"in",email:"",msg:"",err:"",busy:false}, rtChannel=null;
-var editing=null, editingVersion=null, dirty=false, query="", pickerOpen=false, modal=null, exitArmed=false, delArmed=false, conflict=null, busy=false;
+var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pickerOpen=false, modal=null, exitArmed=false, delArmed=false, conflict=null, busy=false;
 var app=document.getElementById("app");
 
 /* ---------- helpers ---------- */
@@ -34,7 +34,48 @@ function stName(id){for(var i=0;i<STATUSES.length;i++)if(STATUSES[i].id===id)ret
 function evHalls(ev){return (ev.halls||[]).map(hallById).filter(Boolean)}
 function emptyBlocks(){var b={};CATS.forEach(function(c){b[c.id]={items:[],note:""}});return b}
 function ensureBlocks(ev){ev.blocks=ev.blocks||{};(ev.halls||[]).forEach(function(h){if(!ev.blocks[h])ev.blocks[h]=emptyBlocks();CATS.forEach(function(c){if(!ev.blocks[h][c.id])ev.blocks[h][c.id]={items:[],note:""}})});return ev}
-function catCount(ev,cid){var n=0;(ev.halls||[]).forEach(function(h){var b=ev.blocks&&ev.blocks[h]&&ev.blocks[h][cid];if(b)n+=b.items.filter(function(i){return (i.name||"").trim()}).length});return n}
+function blockCount(b){return b?b.items.filter(function(i){return (i.name||"").trim()}).length+(b.files||[]).filter(function(f){return f.path}).length:0}
+function catCount(ev,cid){var n=0;(ev.halls||[]).forEach(function(h){n+=blockCount(ev.blocks&&ev.blocks[h]&&ev.blocks[h][cid])});return n}
+/* ---------- Light Plot files ---------- */
+var BUCKET="plots", MAX_FILE=50*1024*1024, PLOT_ACCEPT=".pdf,.png,.jpg,.jpeg,.webp,.gif,.vwx,.dwg,.dxf,.mvr,.gdtf,.xml,.zip";
+function fmtSize(n){if(!n&&n!==0)return "";if(n<1024)return n+" Б";if(n<1048576)return Math.round(n/1024)+" КБ";return (n/1048576).toFixed(n<10485760?1:0).replace(".",",")+" МБ"}
+function fileExt(name){var m=/\.([a-z0-9]{1,6})$/i.exec(name||"");return m?m[1].toLowerCase():""}
+function isImg(f){return /^(png|jpe?g|webp|gif)$/.test(fileExt(f.name))}
+function fileUrl(f){return f.path?sb.storage.from(BUCKET).getPublicUrl(f.path).data.publicUrl:""}
+function allPaths(ev){var out=[];Object.keys((ev&&ev.blocks)||{}).forEach(function(h){CATS.forEach(function(c){var b=ev.blocks[h][c.id];(b&&b.files||[]).forEach(function(f){if(f.path)out.push(f.path)})})});return out}
+function pathInUse(path,exceptId){return state.events.some(function(e){return e.id!==exceptId&&allPaths(e).indexOf(path)>=0})}
+function removeFiles(paths,exceptId){paths=(paths||[]).filter(function(p){return !pathInUse(p,exceptId)});if(paths.length)sb.storage.from(BUCKET).remove(paths).then(function(){},function(){})}
+function uploading(ev){return Object.keys((ev&&ev.blocks)||{}).some(function(h){return CATS.some(function(c){var b=ev.blocks[h][c.id];return (b&&b.files||[]).some(function(f){return f.uploading})})})}
+function uploadFiles(h,c,list){
+ var b=editing&&editing.blocks[h]&&editing.blocks[h][c];if(!b)return;b.files=b.files||[];
+ Array.prototype.forEach.call(list,function(file){
+  if(file.size>MAX_FILE){toast("«"+file.name+"» больше 50 МБ. Сожмите PDF или загрузите по частям.");return}
+  var ext=fileExt(file.name),entry={id:uid(),name:file.name,size:file.size,uploading:true};
+  var path=editing.id+"/"+uid()+uid()+(ext?"."+ext:"");
+  b.files.push(entry);dirty=true;render();
+  sb.storage.from(BUCKET).upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false,cacheControl:"31536000"}).then(function(r){
+   if(r.error){b.files=b.files.filter(function(f){return f!==entry});toast("Не удалось загрузить «"+file.name+"»: "+r.error.message);render();return}
+   delete entry.uploading;entry.path=path;entry.uploadedAt=Date.now();
+   if(editing){editing._uploaded=editing._uploaded||[];editing._uploaded.push(path)}else removeFiles([path]);
+   render();
+  },function(e){b.files=b.files.filter(function(f){return f!==entry});toast("Не удалось загрузить «"+file.name+"»");render()});
+ });
+}
+function plotsRead(b){
+ var fs=(b.files||[]).filter(function(f){return f.path});if(!fs.length)return "";
+ return '<div class="plots"><span class="eyebrow plots-h">Light Plot</span>'+fs.map(function(f){var u=fileUrl(f),ext=fileExt(f.name).toUpperCase();
+  return '<div class="plot">'+(isImg(f)?'<a class="plot-img" href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="'+esc(f.name)+'" loading="lazy"></a>':'')+
+   '<div class="plot-row"><span class="plot-ext">'+esc(ext||"ФАЙЛ")+'</span><span class="plot-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="plot-size">'+esc(fmtSize(f.size))+'</span></div>'+
+   '<div class="plot-act"><a class="btn sm" href="'+esc(u)+'" target="_blank" rel="noopener">Открыть</a><a class="btn sm" href="'+esc(u+"?download="+encodeURIComponent(f.name))+'">Скачать</a></div></div>'}).join("")+'</div>';
+}
+function plotsEdit(ev,hid,c,b){
+ var fs=b.files||[];
+ return '<div class="plots plots-edit"><span class="eyebrow plots-h">Light Plot</span>'+fs.map(function(f,i){
+  return '<div class="plot-erow"><span class="plot-ext">'+esc(fileExt(f.name).toUpperCase()||"ФАЙЛ")+'</span><span class="plot-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="plot-size">'+(f.uploading?'Загрузка…':esc(fmtSize(f.size)))+'</span>'+
+   (f.uploading?'':'<button class="rm" data-act="rm-plot" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" aria-label="Убрать файл '+esc(f.name)+'">×</button>')+'</div>'}).join("")+
+  '<label class="add-item plot-add"><input type="file" hidden multiple accept="'+PLOT_ACCEPT+'" data-plot-upload="1" data-h="'+hid+'" data-c="'+c.id+'">+ Загрузить Light Plot</label>'+
+  '<p class="hint">PDF, изображения, Vectorworks (.vwx), DWG, MVR, GDTF · до 50 МБ на файл</p></div>';
+}
 function fmtDate(d,opt){if(!d)return "";var dt=new Date(d+"T00:00:00");if(isNaN(dt))return d;return dt.toLocaleDateString("ru-RU",opt||{day:"numeric",month:"long"})}
 function isPast(d){if(!d)return false;var t=new Date();t.setHours(0,0,0,0);return new Date(d+"T00:00:00")<t}
 function route(){var h=location.hash.slice(1);return h.indexOf("ev-")===0?h.slice(3):null}
@@ -88,7 +129,7 @@ function checkAdmin(){
  });
 }
 function loadAdmins(){return sb.from("admins").select("email").order("email").then(function(r){admins=(r.data||[]).map(function(x){return x.email})})}
-function cleanEvent(ev){var e=clone(ev);delete e._new;delete e.updatedAt;delete e.updatedBy;return e}
+function cleanEvent(ev){var e=clone(ev);delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading})})});return e}
 function fail(e,prefix){busy=false;showSaving(false);toast((prefix||"Не удалось сохранить")+": "+((e&&e.message)||"ошибка сети"));return false}
 
 function saveEvent(ev,isNew,force){
@@ -104,6 +145,7 @@ function saveEvent(ev,isNew,force){
    if(!isNew&&!force){conflict={ev:ev};render();return false}
    return fail({message:"нет прав на запись"});
   }
+  var keep=allPaths(ev);removeFiles(editingOrig.filter(function(p){return keep.indexOf(p)<0}),ev.id);editingOrig=[];
   editing=null;dirty=false;exitArmed=false;conflict=null;toast("Сохранено");
   return loadAll().then(function(){if(route()!==ev.id)location.hash="ev-"+ev.id;else render();return true});
  },function(e){return fail(e)});
@@ -117,7 +159,7 @@ function deleteEvent(id){
  busy=true;showSaving(true);
  sb.from("events").delete().eq("id",id).select("id").then(function(r){busy=false;showSaving(false);
   if(r.error||!r.data||!r.data.length)return fail(r.error||{message:"нет прав на удаление"},"Не удалось удалить");
-  toast("ТЗ удалено");go(null);loadAll()});
+  var gone=evById(id);if(gone)removeFiles(allPaths(gone),id);toast("ТЗ удалено");go(null);loadAll()});
 }
 function saveHalls(halls){
  busy=true;showSaving(true);
@@ -237,22 +279,22 @@ function hallsView(ev,isEdit){
  ensureBlocks(ev);
  var done=isEdit?null:(ls.get("tz-done-"+ev.id)||{});
  return halls.map(function(h){
-  var tot=CATS.reduce(function(n,c){return n+ev.blocks[h.id][c.id].items.filter(function(i){return (i.name||"").trim()}).length},0);
+  var tot=CATS.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
   return '<section class="hall" id="hall-'+h.id+'"><div class="hall-h"><h3>'+esc(h.name)+'</h3><span class="eyebrow">'+tot+' поз.</span></div><div class="cats">'+
    CATS.map(function(c){return isEdit?catEdit(ev,h.id,c):catRead(ev,h.id,c,done)}).join("")+'</div></section>';
  }).join("")+(isEdit?'':'<p class="hint">Галочки у позиций — личные отметки техника, видны только на этом устройстве.</p>');
 }
 function catRead(ev,hid,c,done){
- var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});
+ var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=plotsRead(b);
  var head='<div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span><span class="n">'+(items.length?items.length+" поз.":"")+'</span></div>';
- if(!items.length&&!(b.note||"").trim())return '<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
- return '<div class="cat cat-'+c.id+'">'+head+'<div class="rows">'+items.map(function(it){var d=!!done[it.id];
-  return '<label class="row'+(d?" done":"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+'</label>'}).join("")+'</div>'+
+ if(!items.length&&!plots&&!(b.note||"").trim())return '<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
+ return '<div class="cat cat-'+c.id+'">'+head+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id];
+  return '<label class="row'+(d?" done":"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+'</label>'}).join("")+'</div>':'')+
   ((b.note||"").trim()?'<p class="cat-note">'+esc(b.note)+'</p>':'')+'</div>';
 }
 function catEdit(ev,hid,c){
  var b=ev.blocks[hid][c.id];
- return '<div class="cat cat-'+c.id+'"><div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span></div><div class="rows">'+
+ return '<div class="cat cat-'+c.id+'"><div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span></div>'+(c.id==="light"?plotsEdit(ev,hid,c,b):'')+'<div class="rows">'+
   b.items.map(function(it,i){var k=hid+"-"+c.id+"-"+it.id;
    var last=b.items.length-1,at=' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"';
    return '<div class="erow" data-erow="'+hid+'|'+c.id+'|'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="n-'+k+'" data-f="item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="name" list="dl-'+c.id+'" value="'+esc(it.name)+'" placeholder="Оборудование / задача" aria-label="Позиция">'+
@@ -341,8 +383,8 @@ function render(){
 
 /* ---------- events ---------- */
 function newEvent(status){return {id:uid(),title:"",date:"",mount:"",rehearsal:"",start:"",end:"",status:status||"draft",halls:[],notes:"",blocks:{},_new:true}}
-function startEdit(ev){editing=clone(ev);editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing)}
-function leaveEdit(){var wasNew=editing&&editing._new;editing=null;dirty=false;exitArmed=false;pickerOpen=false;conflict=null;if(wasNew)go(null);else render()}
+function startEdit(ev){editingOrig=allPaths(ev);editing=clone(ev);editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing)}
+function leaveEdit(){if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id);var wasNew=editing&&editing._new;editing=null;dirty=false;exitArmed=false;pickerOpen=false;conflict=null;if(wasNew)go(null);else render()}
 function moveItem(h,c,from,to){
  var arr=editing&&editing.blocks[h]&&editing.blocks[h][c]&&editing.blocks[h][c].items;if(!arr)return;
  if(to<0||to>=arr.length||from===to)return;
@@ -350,6 +392,7 @@ function moveItem(h,c,from,to){
 }
 function saveEditing(){
  if(busy)return;
+ if(uploading(editing)){toast("Дождитесь окончания загрузки файлов");return}
  var ev=clone(editing);var isNew=!!ev._new;
  if(!(ev.title||"").trim())ev.title="Без названия";
  saveEvent(ev,isNew,false);
@@ -389,6 +432,9 @@ app.addEventListener("click",function(e){
   case "unhall":editing.halls=editing.halls.filter(function(h){return h!==d.h});dirty=true;render();break;
   case "add-item":ensureBlocks(editing);editing.blocks[d.h][d.c].items.push({id:uid(),name:"",qty:"",note:""});dirty=true;render();
    var rows=document.querySelectorAll('[data-f="item"][data-h="'+d.h+'"][data-c="'+d.c+'"][data-k="name"]');if(rows.length)rows[rows.length-1].focus();break;
+  case "rm-plot":var pb=editing.blocks[d.h][d.c],pf=pb.files[+d.i];pb.files.splice(+d.i,1);dirty=true;
+   if(pf&&pf.path&&editing._uploaded&&editing._uploaded.indexOf(pf.path)>=0){editing._uploaded=editing._uploaded.filter(function(p){return p!==pf.path});removeFiles([pf.path],editing.id)}
+   render();break;
   case "rm-item":editing.blocks[d.h][d.c].items.splice(+d.i,1);dirty=true;render();break;
   case "mv-up":case "mv-down":var to=+d.i+(a==="mv-up"?-1:1);moveItem(d.h,d.c,+d.i,to);
    var bt=document.querySelector('[data-act="'+a+'"][data-h="'+d.h+'"][data-c="'+d.c+'"][data-i="'+to+'"]');if(bt&&!bt.disabled)bt.focus();break;
@@ -455,6 +501,7 @@ app.addEventListener("change",function(e){
  if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
  if(d.done){var p=d.done.split("|"),k="tz-done-"+p[0],m=ls.get(k)||{};if(t.checked)m[p[1]]=1;else delete m[p[1]];ls.set(k,m);t.closest(".row").classList.toggle("done",t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
+ if(d.plotUpload&&editing&&t.files&&t.files.length){uploadFiles(d.h,d.c,t.files);t.value=""}
 });
 document.addEventListener("click",function(e){if(pickerOpen&&!e.target.closest(".picker")){pickerOpen=false;render()}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(modal){modal=null;render()}else if(pickerOpen){pickerOpen=false;render()}}});

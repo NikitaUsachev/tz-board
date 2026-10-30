@@ -91,7 +91,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:3px 10px 3px 8px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);width:fit-content}
 .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
 .head h2{font-family:var(--f-display);font-weight:700;font-size:clamp(22px,4vw,32px);line-height:1.15;margin:0;letter-spacing:-.015em;text-wrap:balance}
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.fact{box-shadow:0 0 0 .5px var(--line)}
 .fact{background:var(--surface);padding:11px 14px;display:flex;flex-direction:column;gap:3px;min-width:0}
 .fact .v{font-family:var(--f-mono);font-weight:700;font-size:18px}
 .fact .v.txt{font-family:var(--f-body);font-size:16px;font-weight:600}
@@ -181,6 +182,24 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .theme-btn{gap:6px}
 .theme-btn .ic{font-size:15px;line-height:1}
 @media (max-width:560px){.theme-btn .lbl{display:none}}
+/* Light Plot */
+.plots{display:flex;flex-direction:column;gap:8px;padding-bottom:4px}
+.plots-h{color:var(--c)}
+.plot{border:1px solid var(--line);border-radius:9px;background:var(--surface-2);padding:8px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.plot-img{display:block;border-radius:6px;overflow:hidden;background:var(--surface);border:1px solid var(--line)}
+.plot-img img{display:block;width:100%;max-height:260px;object-fit:contain}
+.plot-row,.plot-erow{display:flex;align-items:center;gap:8px;min-width:0}
+.plot-erow{padding:6px 0;border-top:1px solid var(--line)}
+.plot-erow:first-of-type{border-top:0}
+.plot-ext{flex:none;font-family:var(--f-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;padding:3px 6px;border-radius:5px;background:var(--c);color:var(--surface)}
+.plot-name{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plot-size{flex:none;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.plot-act{display:flex;gap:6px;flex-wrap:wrap}
+.plot-act .btn{flex:1}
+.plot-erow .rm{flex:none;width:28px;height:28px;border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;border-radius:6px}
+.plot-erow .rm:hover{color:var(--danger);background:var(--surface-2)}
+.plot-add{cursor:pointer;display:inline-flex}
+.plots-edit{border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:2px}
 /* auth screen */
 .auth{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;padding-block:16px 48px}
 .auth-top{align-self:stretch;display:flex;justify-content:flex-end;max-width:1500px;width:100%;margin:0 auto}
