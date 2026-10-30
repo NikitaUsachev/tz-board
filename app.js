@@ -292,6 +292,8 @@ function cardView(e){
   '<div class="card-date"><span class="d">'+(e.date?esc(fmtDate(e.date,{day:"2-digit",month:"2-digit",year:"numeric"})):"Дата не указана")+'</span><span class="w">'+esc(e.date?fmtDate(e.date,{weekday:"short"}):"")+'</span>'+(isPast(e.date)&&e.status!=="done"?'<span class="past">прошло</span>':'')+'</div>'+
   '<h3>'+esc(e.title||"Без названия")+'</h3>'+
   (time?'<div class="time mono">'+esc(time)+'</div>':'')+
+  (function(){var mg=(e.manager||"").trim(),pa=(e.padmin||"").trim();if(!mg&&!pa)return "";
+   return '<div class="card-team">'+(mg?'<div><span>Менеджер</span><b>'+esc(mg)+'</b></div>':'')+(pa?'<div><span>Администратор</span><b>'+esc(pa)+'</b></div>':'')+'</div>'})()+
   (halls.length?'<div class="chips">'+halls.map(function(h){return '<span class="chip">'+esc(h.name)+'</span>'}).join("")+'</div>':'')+
   '<div class="counts">'+CATS.filter(function(c){return !isGen(c.id)||catCount(e,c.id)}).map(function(c){return '<span class="c-'+c.id+'" title="'+c.name+'">'+c.name+' '+catCount(e,c.id)+'</span>'}).join("")+'</div>'+
  '</a>';

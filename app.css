@@ -353,3 +353,8 @@ a.tel:hover{text-decoration:underline}
 .stage-edit .se-wide{grid-column:span 2}
 @media (max-width:420px){.stage-edit .se-wide{grid-column:1/-1}}
 .stage-edit input,.stage-edit select{min-width:0;width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface)}
+/* ---------- card team ---------- */
+.card-team{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;font-size:13px}
+.card-team div{display:contents}
+.card-team span{color:var(--muted)}
+.card-team b{font-weight:500;overflow-wrap:anywhere}
