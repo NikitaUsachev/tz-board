@@ -200,6 +200,17 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .plot-erow .rm:hover{color:var(--danger);background:var(--surface-2)}
 .plot-add{cursor:pointer;display:inline-flex}
 .plots-edit{border-bottom:1px dashed var(--line);padding-bottom:10px;margin-bottom:2px}
+.docs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;--c:var(--accent)}
+.docs .plots{padding-bottom:0}
+.docs .plots-edit{border:1px dashed var(--line);border-radius:10px;padding:10px;margin:0}
+.link-url{font-family:var(--f-mono);font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.link-note{font-size:13.5px}
+.link-erow{display:grid;grid-template-columns:minmax(0,1fr) 32px;gap:6px;padding:8px 0;border-top:1px solid var(--line)}
+.link-erow:first-of-type{border-top:0}
+.link-erow input{min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2)}
+.link-erow .lu{grid-column:1/2;font-family:var(--f-mono);font-size:13px}
+.link-erow .rm{grid-row:1;grid-column:2;border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;border-radius:6px}
+.link-erow .rm:hover{color:var(--danger);background:var(--surface-2)}
 /* auth screen */
 .auth{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;padding-block:16px 48px}
 .auth-top{align-self:stretch;display:flex;justify-content:flex-end;max-width:1500px;width:100%;margin:0 auto}

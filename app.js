@@ -34,7 +34,7 @@ function stName(id){for(var i=0;i<STATUSES.length;i++)if(STATUSES[i].id===id)ret
 function evHalls(ev){return (ev.halls||[]).map(hallById).filter(Boolean)}
 function emptyBlocks(){var b={};CATS.forEach(function(c){b[c.id]={items:[],note:""}});return b}
 function ensureBlocks(ev){ev.blocks=ev.blocks||{};(ev.halls||[]).forEach(function(h){if(!ev.blocks[h])ev.blocks[h]=emptyBlocks();CATS.forEach(function(c){if(!ev.blocks[h][c.id])ev.blocks[h][c.id]={items:[],note:""}})});return ev}
-function blockCount(b){return b?b.items.filter(function(i){return (i.name||"").trim()}).length+(b.files||[]).filter(function(f){return f.path}).length:0}
+function blockCount(b){return b?b.items.filter(function(i){return (i.name||"").trim()}).length+(b.files||[]).filter(function(f){return f.path}).length+(b.links||[]).filter(function(l){return (l.url||"").trim()}).length:0}
 function catCount(ev,cid){var n=0;(ev.halls||[]).forEach(function(h){n+=blockCount(ev.blocks&&ev.blocks[h]&&ev.blocks[h][cid])});return n}
 /* ---------- Light Plot files ---------- */
 var BUCKET="plots", MAX_FILE=50*1024*1024, PLOT_ACCEPT=".pdf,.png,.jpg,.jpeg,.webp,.gif,.vwx,.dwg,.dxf,.mvr,.gdtf,.xml,.zip";
@@ -42,39 +42,69 @@ function fmtSize(n){if(!n&&n!==0)return "";if(n<1024)return n+" Б";if(n<1048576
 function fileExt(name){var m=/\.([a-z0-9]{1,6})$/i.exec(name||"");return m?m[1].toLowerCase():""}
 function isImg(f){return /^(png|jpe?g|webp|gif)$/.test(fileExt(f.name))}
 function fileUrl(f){return f.path?sb.storage.from(BUCKET).getPublicUrl(f.path).data.publicUrl:""}
-function allPaths(ev){var out=[];Object.keys((ev&&ev.blocks)||{}).forEach(function(h){CATS.forEach(function(c){var b=ev.blocks[h][c.id];(b&&b.files||[]).forEach(function(f){if(f.path)out.push(f.path)})})});return out}
+var DOCS=[{id:"tech",name:"Технический сценарий"},{id:"director",name:"Режиссёрский сценарий"}];
+var DOC_ACCEPT=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.rtf,.txt,.png,.jpg,.jpeg,.webp,.zip";
+function fileLists(ev){var out=[];if(!ev)return out;Object.keys(ev.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=ev.blocks[h][c.id];if(b&&b.files)out.push(b.files)})});DOCS.forEach(function(d){if(ev.docs&&ev.docs[d.id])out.push(ev.docs[d.id])});return out}
+function allPaths(ev){var out=[];fileLists(ev).forEach(function(l){l.forEach(function(f){if(f.path)out.push(f.path)})});return out}
 function pathInUse(path,exceptId){return state.events.some(function(e){return e.id!==exceptId&&allPaths(e).indexOf(path)>=0})}
 function removeFiles(paths,exceptId){paths=(paths||[]).filter(function(p){return !pathInUse(p,exceptId)});if(paths.length)sb.storage.from(BUCKET).remove(paths).then(function(){},function(){})}
-function uploading(ev){return Object.keys((ev&&ev.blocks)||{}).some(function(h){return CATS.some(function(c){var b=ev.blocks[h][c.id];return (b&&b.files||[]).some(function(f){return f.uploading})})})}
-function uploadFiles(h,c,list){
- var b=editing&&editing.blocks[h]&&editing.blocks[h][c];if(!b)return;b.files=b.files||[];
+function uploading(ev){return fileLists(ev).some(function(l){return l.some(function(f){return f.uploading})})}
+/* key: "b|hall|cat" for block files, "d|tech" for event documents */
+function listFor(key){
+ if(!editing)return null;var p=key.split("|");
+ if(p[0]==="b"){var b=editing.blocks[p[1]]&&editing.blocks[p[1]][p[2]];if(!b)return null;b.files=b.files||[];return b.files}
+ editing.docs=editing.docs||{};editing.docs[p[1]]=editing.docs[p[1]]||[];return editing.docs[p[1]];
+}
+function uploadFiles(key,list){
+ var arr=listFor(key);if(!arr)return;
  Array.prototype.forEach.call(list,function(file){
-  if(file.size>MAX_FILE){toast("«"+file.name+"» больше 50 МБ. Сожмите PDF или загрузите по частям.");return}
+  if(file.size>MAX_FILE){toast("«"+file.name+"» больше 50 МБ. Сожмите файл или загрузите по частям.");return}
   var ext=fileExt(file.name),entry={id:uid(),name:file.name,size:file.size,uploading:true};
   var path=editing.id+"/"+uid()+uid()+(ext?"."+ext:"");
-  b.files.push(entry);dirty=true;render();
+  arr.push(entry);dirty=true;render();
+  var drop=function(msg){var i=arr.indexOf(entry);if(i>=0)arr.splice(i,1);toast(msg);render()};
   sb.storage.from(BUCKET).upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false,cacheControl:"31536000"}).then(function(r){
-   if(r.error){b.files=b.files.filter(function(f){return f!==entry});toast("Не удалось загрузить «"+file.name+"»: "+r.error.message);render();return}
+   if(r.error){drop("Не удалось загрузить «"+file.name+"»: "+r.error.message);return}
    delete entry.uploading;entry.path=path;entry.uploadedAt=Date.now();
    if(editing){editing._uploaded=editing._uploaded||[];editing._uploaded.push(path)}else removeFiles([path]);
    render();
-  },function(e){b.files=b.files.filter(function(f){return f!==entry});toast("Не удалось загрузить «"+file.name+"»");render()});
+  },function(){drop("Не удалось загрузить «"+file.name+"»")});
  });
 }
-function plotsRead(b){
- var fs=(b.files||[]).filter(function(f){return f.path});if(!fs.length)return "";
- return '<div class="plots"><span class="eyebrow plots-h">Light Plot</span>'+fs.map(function(f){var u=fileUrl(f),ext=fileExt(f.name).toUpperCase();
+function filesRead(files,title){
+ var fs=(files||[]).filter(function(f){return f.path});if(!fs.length)return "";
+ return '<div class="plots"><span class="eyebrow plots-h">'+esc(title)+'</span>'+fs.map(function(f){var u=fileUrl(f),ext=fileExt(f.name).toUpperCase();
   return '<div class="plot">'+(isImg(f)?'<a class="plot-img" href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="'+esc(f.name)+'" loading="lazy"></a>':'')+
    '<div class="plot-row"><span class="plot-ext">'+esc(ext||"ФАЙЛ")+'</span><span class="plot-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="plot-size">'+esc(fmtSize(f.size))+'</span></div>'+
    '<div class="plot-act"><a class="btn sm" href="'+esc(u)+'" target="_blank" rel="noopener">Открыть</a><a class="btn sm" href="'+esc(u+"?download="+encodeURIComponent(f.name))+'">Скачать</a></div></div>'}).join("")+'</div>';
 }
-function plotsEdit(ev,hid,c,b){
- var fs=b.files||[];
- return '<div class="plots plots-edit"><span class="eyebrow plots-h">Light Plot</span>'+fs.map(function(f,i){
+function filesEdit(files,title,key,accept,btn,hint){
+ var fs=files||[];
+ return '<div class="plots plots-edit"><span class="eyebrow plots-h">'+esc(title)+'</span>'+fs.map(function(f,i){
   return '<div class="plot-erow"><span class="plot-ext">'+esc(fileExt(f.name).toUpperCase()||"ФАЙЛ")+'</span><span class="plot-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="plot-size">'+(f.uploading?'Загрузка…':esc(fmtSize(f.size)))+'</span>'+
-   (f.uploading?'':'<button class="rm" data-act="rm-plot" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" aria-label="Убрать файл '+esc(f.name)+'">×</button>')+'</div>'}).join("")+
-  '<label class="add-item plot-add"><input type="file" hidden multiple accept="'+PLOT_ACCEPT+'" data-plot-upload="1" data-h="'+hid+'" data-c="'+c.id+'">+ Загрузить Light Plot</label>'+
-  '<p class="hint">PDF, изображения, Vectorworks (.vwx), DWG, MVR, GDTF · до 50 МБ на файл</p></div>';
+   (f.uploading?'':'<button class="rm" data-act="rm-file" data-key="'+esc(key)+'" data-i="'+i+'" aria-label="Убрать файл '+esc(f.name)+'">×</button>')+'</div>'}).join("")+
+  '<label class="add-item plot-add"><input type="file" hidden multiple accept="'+accept+'" data-upload="'+esc(key)+'">'+esc(btn)+'</label>'+
+  (hint?'<p class="hint">'+esc(hint)+'</p>':'')+'</div>';
+}
+function plotsRead(b){return filesRead(b.files,"Light Plot")}
+function plotsEdit(ev,hid,c,b){return filesEdit(b.files,"Light Plot","b|"+hid+"|"+c.id,PLOT_ACCEPT,"+ Загрузить Light Plot","PDF, изображения, Vectorworks (.vwx), DWG, MVR, GDTF · до 50 МБ на файл")}
+/* video content links */
+function normUrl(u){u=(u||"").trim();if(!u)return "";if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(u))u="https://"+u;return u}
+function hostOf(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return ""}}
+function linksRead(b){
+ var ls=(b.links||[]).filter(function(l){return (l.url||"").trim()});if(!ls.length)return "";
+ return '<div class="plots"><span class="eyebrow plots-h">Контент</span>'+ls.map(function(l){var u=normUrl(l.url),safe=/^https?:\/\//i.test(u);
+  return '<div class="plot link-card"><div class="plot-row"><span class="plot-ext">LINK</span><span class="plot-name" title="'+esc(l.title||u)+'">'+esc(l.title||hostOf(u)||u)+'</span></div>'+
+   '<div class="link-url">'+esc(u)+'</div>'+(l.note?'<div class="link-note">'+esc(l.note)+'</div>':'')+
+   (safe?'<div class="plot-act"><a class="btn sm" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">Открыть</a></div>':'')+'</div>'}).join("")+'</div>';
+}
+function linksEdit(hid,c,b){
+ var ls=b.links||[];
+ return '<div class="plots plots-edit"><span class="eyebrow plots-h">Ссылки на контент</span>'+ls.map(function(l,i){var k=hid+"-"+i;
+  return '<div class="link-erow"><input id="lt-'+k+'" data-f="link" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="title" value="'+esc(l.title)+'" placeholder="Название, например «Заставка и лупы»" aria-label="Название ссылки">'+
+   '<button class="rm" data-act="rm-link" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" aria-label="Удалить ссылку">×</button>'+
+   '<input id="lu-'+k+'" class="lu" type="url" inputmode="url" data-f="link" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="url" value="'+esc(l.url)+'" placeholder="https://disk.yandex.ru/…" aria-label="Ссылка"></div>'}).join("")+
+  '<button class="add-item" data-act="add-link" data-h="'+hid+'" data-c="'+c.id+'">+ Ссылка на контент</button><p class="hint">Яндекс Диск, Google Drive, Dropbox, облако площадки — любая ссылка</p></div>';
 }
 function fmtDate(d,opt){if(!d)return "";var dt=new Date(d+"T00:00:00");if(isNaN(dt))return d;return dt.toLocaleDateString("ru-RU",opt||{day:"numeric",month:"long"})}
 function isPast(d){if(!d)return false;var t=new Date();t.setHours(0,0,0,0);return new Date(d+"T00:00:00")<t}
@@ -129,7 +159,7 @@ function checkAdmin(){
  });
 }
 function loadAdmins(){return sb.from("admins").select("email").order("email").then(function(r){admins=(r.data||[]).map(function(x){return x.email})})}
-function cleanEvent(ev){var e=clone(ev);delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading})})});return e}
+function cleanEvent(ev){var e=clone(ev);delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
 function fail(e,prefix){busy=false;showSaving(false);toast((prefix||"Не удалось сохранить")+": "+((e&&e.message)||"ошибка сети"));return false}
 
 function saveEvent(ev,isNew,force){
@@ -265,6 +295,9 @@ function headView(ev,isEdit){
  h+='</div></div>';
  if(isEdit)h+='<label class="halls-row"><span class="eyebrow">Общие примечания</span><textarea id="f-notes" data-f="notes" placeholder="Контакты, доступ на площадку, особые условия">'+esc(ev.notes)+'</textarea></label>';
  else if((ev.notes||"").trim())h+='<div class="halls-row"><span class="eyebrow">Примечания</span><p class="notes">'+esc(ev.notes)+'</p></div>';
+ var docs=ev.docs||{};
+ if(isEdit)h+='<div class="docs">'+DOCS.map(function(d){return filesEdit(docs[d.id],d.name,"d|"+d.id,DOC_ACCEPT,"+ Загрузить","")}).join("")+'</div><p class="hint">PDF, Word, Excel, PowerPoint, изображения · до 50 МБ на файл</p>';
+ else{var dh=DOCS.map(function(d){return filesRead(docs[d.id],d.name)}).join("");if(dh)h+='<div class="docs">'+dh+'</div>'}
  if(!isEdit&&ev.updatedAt)h+='<p class="hint">Обновлено '+esc(new Date(ev.updatedAt).toLocaleString("ru-RU",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"}))+(isAdmin&&ev.updatedBy?" · "+esc(ev.updatedBy):"")+'</p>';
  return h+'</header>';
 }
@@ -285,7 +318,7 @@ function hallsView(ev,isEdit){
  }).join("")+(isEdit?'':'<p class="hint">Галочки у позиций — личные отметки техника, видны только на этом устройстве.</p>');
 }
 function catRead(ev,hid,c,done){
- var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=plotsRead(b);
+ var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
  var head='<div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span><span class="n">'+(items.length?items.length+" поз.":"")+'</span></div>';
  if(!items.length&&!plots&&!(b.note||"").trim())return '<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id];
@@ -294,7 +327,7 @@ function catRead(ev,hid,c,done){
 }
 function catEdit(ev,hid,c){
  var b=ev.blocks[hid][c.id];
- return '<div class="cat cat-'+c.id+'"><div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span></div>'+(c.id==="light"?plotsEdit(ev,hid,c,b):'')+'<div class="rows">'+
+ return '<div class="cat cat-'+c.id+'"><div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span></div>'+(c.id==="light"?plotsEdit(ev,hid,c,b):c.id==="video"?linksEdit(hid,c,b):'')+'<div class="rows">'+
   b.items.map(function(it,i){var k=hid+"-"+c.id+"-"+it.id;
    var last=b.items.length-1,at=' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"';
    return '<div class="erow" data-erow="'+hid+'|'+c.id+'|'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="n-'+k+'" data-f="item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="name" list="dl-'+c.id+'" value="'+esc(it.name)+'" placeholder="Оборудование / задача" aria-label="Позиция">'+
@@ -432,7 +465,10 @@ app.addEventListener("click",function(e){
   case "unhall":editing.halls=editing.halls.filter(function(h){return h!==d.h});dirty=true;render();break;
   case "add-item":ensureBlocks(editing);editing.blocks[d.h][d.c].items.push({id:uid(),name:"",qty:"",note:""});dirty=true;render();
    var rows=document.querySelectorAll('[data-f="item"][data-h="'+d.h+'"][data-c="'+d.c+'"][data-k="name"]');if(rows.length)rows[rows.length-1].focus();break;
-  case "rm-plot":var pb=editing.blocks[d.h][d.c],pf=pb.files[+d.i];pb.files.splice(+d.i,1);dirty=true;
+  case "add-link":var lb=editing.blocks[d.h][d.c];lb.links=lb.links||[];lb.links.push({id:uid(),title:"",url:""});dirty=true;render();
+   var lts=document.querySelectorAll('[data-f="link"][data-h="'+d.h+'"][data-c="'+d.c+'"][data-k="title"]');if(lts.length)lts[lts.length-1].focus();break;
+  case "rm-link":editing.blocks[d.h][d.c].links.splice(+d.i,1);dirty=true;render();break;
+  case "rm-file":var farr=listFor(d.key),pf=farr&&farr[+d.i];if(!farr)break;farr.splice(+d.i,1);dirty=true;
    if(pf&&pf.path&&editing._uploaded&&editing._uploaded.indexOf(pf.path)>=0){editing._uploaded=editing._uploaded.filter(function(p){return p!==pf.path});removeFiles([pf.path],editing.id)}
    render();break;
   case "rm-item":editing.blocks[d.h][d.c].items.splice(+d.i,1);dirty=true;render();break;
@@ -489,6 +525,7 @@ app.addEventListener("input",function(e){
  var t=e.target,d=t.dataset;
  if(d.f&&editing){
   if(d.f==="item"){editing.blocks[d.h][d.c].items[+d.i][d.k]=t.value}
+  else if(d.f==="link"){editing.blocks[d.h][d.c].links[+d.i][d.k]=t.value}
   else if(d.f==="cnote"){editing.blocks[d.h][d.c].note=t.value}
   else editing[d.f]=t.value;
   if(!dirty||exitArmed){dirty=true;exitArmed=false;var m=document.querySelector(".editbar .msg");if(m)m.textContent="Есть несохранённые изменения"}
@@ -501,7 +538,7 @@ app.addEventListener("change",function(e){
  if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
  if(d.done){var p=d.done.split("|"),k="tz-done-"+p[0],m=ls.get(k)||{};if(t.checked)m[p[1]]=1;else delete m[p[1]];ls.set(k,m);t.closest(".row").classList.toggle("done",t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
- if(d.plotUpload&&editing&&t.files&&t.files.length){uploadFiles(d.h,d.c,t.files);t.value=""}
+ if(d.upload&&editing&&t.files&&t.files.length){uploadFiles(d.upload,t.files);t.value=""}
 });
 document.addEventListener("click",function(e){if(pickerOpen&&!e.target.closest(".picker")){pickerOpen=false;render()}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(modal){modal=null;render()}else if(pickerOpen){pickerOpen=false;render()}}});
