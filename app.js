@@ -75,7 +75,7 @@ function filesRead(files,title){
  var fs=(files||[]).filter(function(f){return f.path});if(!fs.length)return "";
  return '<div class="plots"><span class="eyebrow plots-h">'+esc(title)+'</span>'+fs.map(function(f){var u=fileUrl(f),ext=fileExt(f.name).toUpperCase();
   return '<div class="plot">'+(isImg(f)?'<a class="plot-img" href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="'+esc(f.name)+'" loading="lazy"></a>':'')+
-   '<div class="plot-row"><span class="plot-ext">'+esc(ext||"ФАЙЛ")+'</span><span class="plot-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="plot-size">'+esc(fmtSize(f.size))+'</span></div>'+
+   '<div class="plot-row"><span class="plot-ext">'+esc(ext||"ФАЙЛ")+'</span><span class="plot-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span>'+badge(f.id)+'<span class="plot-size">'+esc(fmtSize(f.size))+'</span></div>'+
    '<div class="plot-act"><a class="btn sm" href="'+esc(u)+'" target="_blank" rel="noopener">Открыть</a><a class="btn sm" href="'+esc(u+"?download="+encodeURIComponent(f.name))+'">Скачать</a></div></div>'}).join("")+'</div>';
 }
 function filesEdit(files,title,key,accept,btn,hint){
@@ -94,7 +94,7 @@ function hostOf(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){
 function linksRead(b){
  var ls=(b.links||[]).filter(function(l){return (l.url||"").trim()});if(!ls.length)return "";
  return '<div class="plots"><span class="eyebrow plots-h">Контент</span>'+ls.map(function(l){var u=normUrl(l.url),safe=/^https?:\/\//i.test(u);
-  return '<div class="plot link-card"><div class="plot-row"><span class="plot-ext">LINK</span><span class="plot-name" title="'+esc(l.title||u)+'">'+esc(l.title||hostOf(u)||u)+'</span></div>'+
+  return '<div class="plot link-card"><div class="plot-row"><span class="plot-ext">LINK</span><span class="plot-name" title="'+esc(l.title||u)+'">'+esc(l.title||hostOf(u)||u)+'</span>'+badge(l.id)+'</div>'+
    '<div class="link-url">'+esc(u)+'</div>'+(l.note?'<div class="link-note">'+esc(l.note)+'</div>':'')+
    (safe?'<div class="plot-act"><a class="btn sm" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">Открыть</a></div>':'')+'</div>'}).join("")+'</div>';
 }
@@ -108,9 +108,10 @@ function linksEdit(hid,c,b){
 }
 function fmtDate(d,opt){if(!d)return "";var dt=new Date(d+"T00:00:00");if(isNaN(dt))return d;return dt.toLocaleDateString("ru-RU",opt||{day:"numeric",month:"long"})}
 function isPast(d){if(!d)return false;var t=new Date();t.setHours(0,0,0,0);return new Date(d+"T00:00:00")<t}
-function route(){var h=location.hash.slice(1);return h.indexOf("ev-")===0?h.slice(3):null}
+function route(){var h=location.hash.slice(1);return h.indexOf("ev-")===0?h.slice(3).split("~")[0]:null}
+function hashDept(){var m=/~(sound|light|video)$/.exec(location.hash);return m?m[1]:null}
 function go(id){if(id){location.hash="ev-"+id}else{if(location.hash){history.pushState(null,"",location.pathname+location.search)}render()}}
-function linkFor(id){return location.origin+location.pathname+"#ev-"+id}
+function linkFor(id,dept){return location.origin+location.pathname+"#ev-"+id+(dept?"~"+dept:"")}
 function homeLink(){return location.origin+location.pathname}
 function myEmail(){return session&&session.user&&session.user.email||""}
 
@@ -135,8 +136,11 @@ function loadTech(id){
  ]).then(function(r){
   if(r[1].error)throw r[1].error;
   state.halls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
-  var row=(r[1].data||[])[0];versions={};
+  var row=(r[1].data||[])[0],prevV=versions[id];versions={};
   state.events=row?[(function(){var e=row.data||{};e.id=row.id;e.updatedAt=Date.parse(row.updated_at)||0;versions[row.id]=row.version;return e})()]:[];
+  if(row){var seen=ls.get("tz-seen-"+row.id);if(!seen||!seen.d)markSeen(state.events[0]);
+   else if(prevV!=null&&prevV!==row.version){toast("ТЗ обновлено администратором");flagTitle(true)}}
+  if(loaded&&!loadError&&row&&prevV===row.version)return;
   loaded=true;loadError="";render();
  }).catch(function(e){loadError=(e&&e.message)||"Нет связи с базой";loaded=true;render()});
 }
@@ -254,11 +258,73 @@ function cardView(e){
 }
 
 /* ---------- event sheet ---------- */
+/* ---------- technician view: departments, collapse, changes ---------- */
+var BASE_TITLE=document.title;
+function flagTitle(on){document.title=(on?"● ":"")+BASE_TITLE}
+function snapEv(ev){var e=cleanEvent(ev);delete e.id;return e}
+function markSeen(ev){ls.set("tz-seen-"+ev.id,{v:versions[ev.id],d:snapEv(ev),at:Date.now()})}
+function deptsFor(evid){var s=ls.get("tz-dept-"+evid);if(s&&s.length)return s;var hd=hashDept();return hd?[hd]:CATS.map(function(c){return c.id})}
+function setDepts(evid,arr){ls.set("tz-dept-"+evid,arr)}
+function collapsed(evid){return ls.get("tz-col-"+evid)||{}}
+function itemLabel(i){return (i.name||"").trim()+(String(i.qty||"").trim()?" ×"+String(i.qty).trim():"")}
+function blk(ev,h,c){var b=ev&&ev.blocks&&ev.blocks[h]&&ev.blocks[h][c];return b||{items:[],note:"",files:[],links:[]}}
+function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x});return m}
+function computeDiff(o,n){
+ var out={head:[],cats:{},marks:{},total:0};
+ var add=function(k,t){(out.cats[k]=out.cats[k]||[]).push(t);out.total++};
+ [["title","Название"],["date","Дата"],["mount","Монтаж"],["rehearsal","Прогоны / репетиции"],["start","Начало"],["end","Завершение"],["status","Статус"],["notes","Примечания"]].forEach(function(f){
+  var a=(o[f[0]]||"").trim?String(o[f[0]]||"").trim():"",b=String(n[f[0]]||"").trim();if(a===b)return;
+  var v=f[0]==="date"?(fmtDate(b,{day:"numeric",month:"long"})||"—"):f[0]==="status"?stName(b):f[0]==="notes"?"изменены":(b||"—");
+  out.head.push(f[1]+": "+(f[0]==="notes"?v:(f[0]==="date"||f[0]==="status"||!a?"":(a+" → "))+v));out.total++});
+ (n.halls||[]).forEach(function(h){if((o.halls||[]).indexOf(h)<0){var x=hallById(h);out.head.push("Добавлен зал: "+(x?x.name:h));out.total++}});
+ (o.halls||[]).forEach(function(h){if((n.halls||[]).indexOf(h)<0){var x=hallById(h);out.head.push("Убран зал: "+(x?x.name:h));out.total++}});
+ DOCS.forEach(function(d){var A=byId((o.docs||{})[d.id]),B=(n.docs||{})[d.id]||[];
+  B.forEach(function(f){if(!A[f.id]){out.head.push(d.name+": новый файл «"+f.name+"»");out.marks[f.id]="new";out.total++}});
+  Object.keys(A).forEach(function(k){if(!B.some(function(f){return f.id===k})){out.head.push(d.name+": удалён файл «"+A[k].name+"»");out.total++}})});
+ (n.halls||[]).forEach(function(h){CATS.forEach(function(c){
+  var ob=blk(o,h,c.id),nb=blk(n,h,c.id),k=h+"|"+c.id,A=byId(ob.items);
+  (nb.items||[]).forEach(function(it){if(!(it.name||"").trim())return;var p=A[it.id];
+   if(!p||!(p.name||"").trim()){add(k,"добавлено: "+itemLabel(it));out.marks[it.id]="new"}
+   else if(itemLabel(p)!==itemLabel(it)||String(p.note||"").trim()!==String(it.note||"").trim()){add(k,"изменено: "+(itemLabel(p)!==itemLabel(it)?itemLabel(p)+" → "+itemLabel(it):itemLabel(it)+" (комментарий)"));out.marks[it.id]="changed"}});
+  (ob.items||[]).forEach(function(it){if((it.name||"").trim()&&!(nb.items||[]).some(function(x){return x.id===it.id&&(x.name||"").trim()}))add(k,"удалено: "+itemLabel(it))});
+  if(String(ob.note||"").trim()!==String(nb.note||"").trim()){add(k,"изменено примечание");out.marks["note|"+k]="changed"}
+  var FA=byId(ob.files);(nb.files||[]).forEach(function(f){if(!FA[f.id]){add(k,"новый файл «"+f.name+"»");out.marks[f.id]="new"}});
+  (ob.files||[]).forEach(function(f){if(!(nb.files||[]).some(function(x){return x.id===f.id}))add(k,"удалён файл «"+f.name+"»")});
+  var LA=byId(ob.links);(nb.links||[]).forEach(function(l){var p=LA[l.id];if(!p){add(k,"новая ссылка «"+(l.title||hostOf(l.url))+"»");out.marks[l.id]="new"}else if(p.url!==l.url||p.title!==l.title){add(k,"изменена ссылка «"+(l.title||hostOf(l.url))+"»");out.marks[l.id]="changed"}});
+  (ob.links||[]).forEach(function(l){if(!(nb.links||[]).some(function(x){return x.id===l.id}))add(k,"удалена ссылка «"+(l.title||hostOf(l.url))+"»")});
+ })});
+ return out;
+}
+var curDiff=null;
+function techDiff(ev){if(isAdmin)return null;var seen=ls.get("tz-seen-"+ev.id);if(!seen||!seen.d||seen.v===versions[ev.id])return null;var d=computeDiff(seen.d,snapEv(ev));if(!d.total){markSeen(ev);return null}return d}
+function changesView(ev,diff,depts){
+ if(!diff)return "";
+ var lines=diff.head.map(function(t){return '<li>'+esc(t)+'</li>'}).join(""),hidden=0;
+ evHalls(ev).forEach(function(h){CATS.forEach(function(c){var arr=diff.cats[h.id+"|"+c.id];if(!arr)return;
+  if(depts.indexOf(c.id)<0){hidden+=arr.length;return}
+  lines+='<li><b>'+esc(h.name)+' · '+c.name+':</b> '+arr.map(esc).join("; ")+'</li>'})});
+ if(!lines&&!hidden)return "";
+ return '<section class="changes" role="status"><div class="ch-h"><span class="ch-dot" aria-hidden="true"></span><b>ТЗ изменилось</b><span class="hint">с вашего прошлого просмотра</span></div>'+
+  (lines?'<ul>'+lines+'</ul>':'<p class="hint">Изменения есть только в других отделах.</p>')+
+  (hidden&&lines?'<p class="hint">Ещё '+hidden+' изм. в других отделах.</p>':'')+
+  '<button class="btn primary sm" data-act="ack" data-id="'+esc(ev.id)+'">Понятно</button></section>';
+}
+function deptBar(ev,depts){
+ var all=depts.length===CATS.length;
+ return '<div class="deptbar"><span class="eyebrow">Мой отдел</span><div class="seg" role="group" aria-label="Показывать отделы">'+
+  '<button class="'+(all?"on":"")+'" data-act="dept" data-dept="all" aria-pressed="'+all+'">Все</button>'+
+  CATS.map(function(c){var on=!all&&depts.indexOf(c.id)>=0;return '<button class="seg-'+c.id+(on?" on":"")+'" data-act="dept" data-dept="'+c.id+'" aria-pressed="'+on+'">'+c.name+'</button>'}).join("")+
+  '</div></div>';
+}
+function badge(id){var m=curDiff&&curDiff.marks[id];return m?'<span class="chg chg-'+m+'">'+(m==="new"?"Новое":"Изменено")+'</span>':''}
+
 function sheetView(id){
  var isEdit=editing&&editing.id===id;
  var ev=isEdit?editing:evById(id);
  if(!ev)return topBar()+'<div class="sheet gut">'+(isAdmin?'<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button></div>':'')+'<div class="no-halls">'+(!loaded?"Загрузка…":loadError?"Не удалось загрузить ТЗ: "+esc(loadError)+'<br><br><button class="btn" data-act="retry">Повторить</button>':"ТЗ не найдено. Проверьте ссылку или попросите администратора прислать новую.")+'</div></div>';
- return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+(isEdit?editBar():'');
+ if(isEdit){curDiff=null;return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
+ var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);
+ return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+changesView(ev,curDiff,depts)+headView(ev,isEdit)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return '';
@@ -306,24 +372,31 @@ function pickerPop(ev){
  return '<div class="pop" role="dialog" aria-label="Выбор залов">'+(state.halls.length?state.halls.map(function(h){return '<label><input type="checkbox" data-hallpick="'+h.id+'"'+(sel.indexOf(h.id)>=0?" checked":"")+'>'+esc(h.name)+'</label>'}).join(""):'<p class="hint" style="padding:8px">Список залов пуст</p>')+
   '<hr><button class="btn ghost sm" data-act="settings">Изменить список залов</button><button class="btn sm primary" data-act="picker">Готово</button></div>';
 }
-function hallsView(ev,isEdit){
+function hallsView(ev,isEdit,depts){
  var halls=evHalls(ev);
  if(!halls.length)return '<div class="no-halls">'+(isEdit?"Выберите зал или несколько залов в шапке — для каждого появятся блоки «Звук», «Свет» и «Видео».":"Залы для этого мероприятия пока не выбраны.")+'</div>';
  ensureBlocks(ev);
  var done=isEdit?null:(ls.get("tz-done-"+ev.id)||{});
  return halls.map(function(h){
-  var tot=CATS.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
-  return '<section class="hall" id="hall-'+h.id+'"><div class="hall-h"><h3>'+esc(h.name)+'</h3><span class="eyebrow">'+tot+' поз.</span></div><div class="cats">'+
-   CATS.map(function(c){return isEdit?catEdit(ev,h.id,c):catRead(ev,h.id,c,done)}).join("")+'</div></section>';
+  if(isEdit){var tot=CATS.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
+   return '<section class="hall" id="hall-'+h.id+'"><div class="hall-h"><h3>'+esc(h.name)+'</h3><span class="eyebrow">'+tot+' поз.</span></div><div class="cats">'+
+   CATS.map(function(c){return catEdit(ev,h.id,c)}).join("")+'</div></section>'}
+  var cats=CATS.filter(function(c){return depts.indexOf(c.id)>=0}),col=collapsed(ev.id),hc=!!col[h.id];
+  var tot2=cats.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
+  var hch=curDiff&&cats.some(function(c){return curDiff.cats[h.id+"|"+c.id]});
+  return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
+   (hc?'':'<div class="cats cats-'+cats.length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
  }).join("")+(isEdit?'':'<p class="hint">Галочки у позиций — личные отметки техника, видны только на этом устройстве.</p>');
 }
-function catRead(ev,hid,c,done){
- var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
- var head='<div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span><span class="n">'+(items.length?items.length+" поз.":"")+'</span></div>';
+function catRead(ev,hid,c,done,col){
+ col=col||{};var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
+ var k=hid+"|"+c.id,cc=!!col[k],n=blockCount(b),ch=curDiff&&curDiff.cats[k];
+ var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed">'+ch.length+'</span>':'')+'<span class="n">'+(n?n+" поз.":"")+'</span></button>';
+ if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+'</div>';
  if(!items.length&&!plots&&!(b.note||"").trim())return '<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
- return '<div class="cat cat-'+c.id+'">'+head+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id];
-  return '<label class="row'+(d?" done":"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+'</label>'}).join("")+'</div>':'')+
-  ((b.note||"").trim()?'<p class="cat-note">'+esc(b.note)+'</p>':'')+'</div>';
+ return '<div class="cat cat-'+c.id+'">'+head+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curDiff&&curDiff.marks[it.id];
+  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+'</label>'}).join("")+'</div>':'')+
+  ((b.note||"").trim()?'<p class="cat-note'+(curDiff&&curDiff.marks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
 }
 function catEdit(ev,hid,c){
  var b=ev.blocks[hid][c.id];
@@ -349,6 +422,9 @@ function datalists(){return CATS.map(function(c){return '<datalist id="dl-'+c.id
 function modalView(){
  if(!modal)return "";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
+ if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(CATS.map(function(c){return {d:c.id,n:c.name}}));
+  return wrap('<h2>Ссылки для техников</h2><p class="hint">Ссылка отдела сразу открывает только его блоки. Техник может переключить отдел сам.</p><div class="linkopts">'+opts.map(function(o){var u=linkFor(modal.id,o.d),iid="lk-"+(o.d||"all");
+   return '<div class="linkopt"><span class="lo-n">'+esc(o.n)+'</span><input id="'+iid+'" readonly value="'+esc(u)+'" aria-label="Ссылка: '+esc(o.n)+'"><button class="btn sm" data-act="copy-one" data-url="'+esc(u)+'" data-inp="'+iid+'">Копировать</button></div>'}).join("")+'</div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылки")}
  if(modal.t==="copy")return wrap('<h2>Ссылка на ТЗ</h2><p class="hint">Скопируйте и отправьте техникам.</p><div class="copybox"><input id="copy-in" readonly value="'+esc(modal.text)+'"></div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылка");
  if(modal.t==="newpass")return wrap('<h2>Новый пароль</h2><form id="newpass-form" class="halls-row"><input id="np-1" class="full" type="password" minlength="8" required autocomplete="new-password" placeholder="Новый пароль, от 8 символов"><input id="np-2" class="full" type="password" minlength="8" required autocomplete="new-password" placeholder="Повторите пароль">'+(modal.err?'<p class="hint" style="color:var(--danger)">'+esc(modal.err)+'</p>':'')+'<div class="bar"><span class="sp"></span><button type="submit" class="btn primary">Сохранить пароль</button></div></form>',"Новый пароль");
  if(modal.t==="account")return wrap('<h2>Аккаунт</h2><p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+'<p class="hint">Адрес для входа администраторов: <b class="mono" style="overflow-wrap:anywhere">'+esc(homeLink())+'</b></p>'+
@@ -462,8 +538,16 @@ app.addEventListener("click",function(e){
    startEdit(cp);editing._new=true;dirty=true;location.hash="ev-"+cp.id;break;
   case "del":if(!delArmed){delArmed=true;render();setTimeout(function(){if(delArmed){delArmed=false;render()}},4000);return}
    delArmed=false;deleteEvent(d.id);break;
-  case "copy":copyText(linkFor(d.id));break;
-  case "jump":var el=document.getElementById("hall-"+d.h);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});break;
+  case "copy":modal={t:"links",id:d.id};render();break;
+  case "copy-one":var cv=d.url;if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(cv).then(function(){toast("Ссылка скопирована")},function(){var ci=document.getElementById(d.inp);if(ci){ci.focus();ci.select()}toast("Выделите ссылку и скопируйте вручную")})}else{var ci2=document.getElementById(d.inp);if(ci2){ci2.focus();ci2.select()}}break;
+  case "dept":var evd=route();if(!evd)break;var cur=deptsFor(evd),allOn=cur.length===CATS.length;
+   if(d.dept==="all")cur=CATS.map(function(c){return c.id});
+   else if(allOn)cur=[d.dept];
+   else{var ix=cur.indexOf(d.dept);if(ix>=0)cur.splice(ix,1);else cur.push(d.dept);if(!cur.length)cur=CATS.map(function(c){return c.id})}
+   cur=CATS.map(function(c){return c.id}).filter(function(x){return cur.indexOf(x)>=0});setDepts(evd,cur);render();break;
+  case "tog":var evt=route();if(!evt)break;var cl=collapsed(evt);if(cl[d.k])delete cl[d.k];else cl[d.k]=1;ls.set("tz-col-"+evt,cl);render();break;
+  case "ack":var eva=evById(d.id);if(eva){markSeen(eva);curDiff=null;flagTitle(false);render();toast("Отмечено как прочитанное")}break;
+  case "jump":var evj=route(),clj=evj&&collapsed(evj);if(clj&&clj[d.h]){delete clj[d.h];ls.set("tz-col-"+evj,clj);render()}var el=document.getElementById("hall-"+d.h);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});break;
   case "picker":pickerOpen=!pickerOpen;render();break;
   case "unhall":editing.halls=editing.halls.filter(function(h){return h!==d.h});dirty=true;render();break;
   case "add-item":ensureBlocks(editing);editing.blocks[d.h][d.c].items.push({id:uid(),name:"",qty:"",note:""});dirty=true;render();
@@ -596,4 +680,5 @@ sb.auth.onAuthStateChange(function(ev,s){
  render();
 });
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&!editing&&authReady)scheduleReload()});
+setInterval(function(){if(authReady&&!isAdmin&&route()&&!document.hidden)loadTech(route())},60000);
 })();
