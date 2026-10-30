@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ТЗ на мероприятия</title>
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFFFFF">
+<script>try{var t=JSON.parse(localStorage.getItem("tz-theme")||"null");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);document.querySelector('meta[name="theme-color"]').setAttribute("content",t==="dark"?"#151C26":"#FFFFFF")}}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
@@ -22,6 +24,7 @@ body{margin:0}
   --f-body:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
   --r:10px;
+  color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0E131A; --surface:#151C26; --surface-2:#1B2430; --ink:#E5EAF1; --muted:#95A2B4; --line:#2A3443;
@@ -189,6 +192,10 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .copybox{display:flex;gap:6px}
 .copybox input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-family:var(--f-mono);font-size:12.5px}
 .foot{font-size:12.5px;color:var(--muted);text-align:center;padding-block:0 30px}
+/* theme switch */
+.theme-btn{gap:6px}
+.theme-btn .ic{font-size:15px;line-height:1}
+@media (max-width:560px){.theme-btn .lbl{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (max-width:560px){.head{padding:16px}.top-in{gap:8px}.brand h1{font-size:17px}.search{order:5;flex-basis:100%;max-width:none}}
 
@@ -223,6 +230,14 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){retur
 function uid(){return Math.random().toString(36).slice(2,10)}
 function clone(o){return JSON.parse(JSON.stringify(o))}
 var ls={get:function(k){try{var v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+/* ---------- theme ---------- */
+var mq=window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):null;
+function curTheme(){var t=document.documentElement.getAttribute("data-theme");if(t==="dark"||t==="light")return t;return mq&&mq.matches?"dark":"light"}
+function applyTheme(t){document.documentElement.setAttribute("data-theme",t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#151C26":"#FFFFFF")}
+(function(){var s=ls.get("tz-theme");if(s==="dark"||s==="light")applyTheme(s)})();
+if(mq){var onMq=function(){if(!ls.get("tz-theme"))render()};if(mq.addEventListener)mq.addEventListener("change",onMq);else if(mq.addListener)mq.addListener(onMq)}
+function themeBtn(){var d=curTheme()==="dark";return '<button class="btn ghost sm theme-btn" data-act="theme" aria-label="'+(d?"Включить светлую тему":"Включить тёмную тему")+'" title="'+(d?"Светлая тема":"Тёмная тема")+'"><span class="ic" aria-hidden="true">'+(d?"☀":"☾")+'</span><span class="lbl">'+(d?"Светлая":"Тёмная")+'</span></button>'}
+
 function hallById(id){for(var i=0;i<state.halls.length;i++)if(state.halls[i].id===id)return state.halls[i];return null}
 function evById(id){for(var i=0;i<state.events.length;i++)if(state.events[i].id===id)return state.events[i];return null}
 function stName(id){for(var i=0;i<STATUSES.length;i++)if(STATUSES[i].id===id)return STATUSES[i].name;return id}
@@ -313,7 +328,7 @@ function topBar(){
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
   (isAdmin?'<button class="btn" data-act="settings">Настройки</button>':'')+
   (isAdmin&&onBoard?'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'')+
-  auth+
+  themeBtn()+auth+
  '</div></header>'+conflictBanner();
 }
 function conflictBanner(){
@@ -537,6 +552,7 @@ app.addEventListener("click",function(e){
   case "save-settings":var halls=modal.halls.filter(function(h){return h.name.trim()}).map(function(h){return {id:h.id,name:h.name.trim()}});
    saveHalls(halls).then(function(ok){if(ok&&modal)modal.halls=clone(state.halls);render()});break;
   case "rm-admin":sb.from("admins").delete().eq("email",d.email).then(function(r){if(r.error)toast("Не удалось: "+r.error.message);loadAdmins().then(render)});break;
+  case "theme":var nt=curTheme()==="dark"?"light":"dark";applyTheme(nt);ls.set("tz-theme",nt);render();break;
   case "close":case "close-bg":modal=null;render();break;
  }
 });
