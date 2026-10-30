@@ -358,3 +358,4 @@ a.tel:hover{text-decoration:underline}
 .card-team div{display:contents}
 .card-team span{color:var(--muted)}
 .card-team b{font-weight:500;overflow-wrap:anywhere}
+.fact-act{font-size:12px;color:var(--muted)}
