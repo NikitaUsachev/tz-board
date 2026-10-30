@@ -150,6 +150,21 @@ function loadTech(id){
   loaded=true;loadError="";render();
  }).catch(function(e){loadError=(e&&e.message)||"Нет связи с базой";loaded=true;render()});
 }
+/* ---------- shared "done" checks ---------- */
+var checks={},checksFor=null,checksKey="",pendingCheck=null;
+function loadChecks(id){if(!id)return Promise.resolve();
+ return sb.rpc("get_checks",{p_id:id}).then(function(r){if(r.error||route()!==id)return;var m={};(r.data||[]).forEach(function(x){m[x.item_id]={by:x.by_name||"",at:x.at}});
+  var k=JSON.stringify(m);checksFor=id;if(k!==checksKey){checksKey=k;checks=m;if(!editing&&!modal)render()}})}
+function myName(){return isAdmin?(ls.get("tz-me")||myEmail().split("@")[0]):(ls.get("tz-me")||"")}
+function shortName(n){var p=String(n||"").trim().split(/\s+/);return p.length>1?p[0]+" "+p[1].charAt(0)+".":p[0]||""}
+function fmtWhen(at){var d=new Date(at);if(isNaN(d))return "";var t=d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});var today=new Date();return d.toDateString()===today.toDateString()?t:d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" "+t}
+function setCheck(evid,item,done){
+ var prev=checks[item];if(done)checks[item]={by:myName(),at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";render();
+ sb.rpc("set_check",{p_event:evid,p_item:item,p_done:done,p_by:myName()}).then(function(r){
+  if(r.error){if(prev)checks[item]=prev;else delete checks[item];render();toast("Не удалось сохранить отметку: "+r.error.message);return}
+  if(checks[item])delete checks[item].pending;loadChecks(evid)});
+}
+setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
 var reloadT;
 function scheduleReload(){clearTimeout(reloadT);reloadT=setTimeout(function(){if(isAdmin)loadAll();else if(route())loadTech(route())},400)}
 function subscribe(){
@@ -332,6 +347,7 @@ function sheetView(id){
  var ev=isEdit?editing:evById(id);
  if(!ev)return topBar()+'<div class="sheet gut">'+(isAdmin?'<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button></div>':'')+'<div class="no-halls">'+(!loaded?"Загрузка…":loadError?"Не удалось загрузить ТЗ: "+esc(loadError)+'<br><br><button class="btn" data-act="retry">Повторить</button>':"ТЗ не найдено. Проверьте ссылку или попросите администратора прислать новую.")+'</div></div>';
  if(isEdit){curDiff=null;return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
+ if(checksFor!==ev.id){checksFor=ev.id;checks={};checksKey="";loadChecks(ev.id)}
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);
  return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+changesView(ev,curDiff,depts)+headView(ev,isEdit)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
@@ -385,7 +401,7 @@ function hallsView(ev,isEdit,depts){
  var halls=evHalls(ev);
  if(!halls.length)return '<div class="no-halls">'+(isEdit?"Выберите зал или несколько залов в шапке — для каждого появятся блоки «Звук», «Свет» и «Видео».":"Залы для этого мероприятия пока не выбраны.")+'</div>';
  ensureBlocks(ev);
- var done=isEdit?null:(ls.get("tz-done-"+ev.id)||{});
+ var done=isEdit?null:checks;
  return halls.map(function(h){
   if(isEdit){var tot=CATS.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
    return '<section class="hall" id="hall-'+h.id+'"><div class="hall-h"><h3>'+esc(h.name)+'</h3><span class="eyebrow">'+tot+' поз.</span></div><div class="cats">'+
@@ -395,7 +411,7 @@ function hallsView(ev,isEdit,depts){
   var hch=curDiff&&cats.some(function(c){return curDiff.cats[h.id+"|"+c.id]});
   return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
    (hc?'':'<div class="cats cats-'+cats.length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
- }).join("")+(isEdit?'':'<p class="hint">Галочки у позиций — личные отметки техника, видны только на этом устройстве.</p>');
+ }).join("")+(isEdit?'':'<p class="hint me-line">Отметки «сделано» видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
 }
 function chiefRead(b,k){if(!hasChief(b))return "";var m=curDiff&&curDiff.marks["chief|"+k];
  return '<div class="chief'+(m?" mk-changed":"")+'"><span class="eyebrow">Бригадир</span><b>'+esc((b.chief.name||"").trim()||"—")+'</b>'+(m?badge("chief|"+k):"")+phoneHtml(b.chief.phone)+'</div>'}
@@ -405,12 +421,12 @@ function staffRead(b){var st=staffOf(b);if(!st.length)return "";
 function catRead(ev,hid,c,done,col){
  col=col||{};var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
  var k=hid+"|"+c.id,cc=!!col[k],n=blockCount(b),ch=curDiff&&curDiff.cats[k];
- var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed">'+ch.length+'</span>':'')+'<span class="n">'+(n?n+" поз.":"")+'</span></button>';
+ var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed">'+ch.length+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}),dn=its.filter(function(i){return checks[i.id]}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
  if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+'</div>';
  var chief=chiefRead(b,k),staff=staffRead(b);
  if(!items.length&&!plots&&!chief&&!staff&&!(b.note||"").trim())return '<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+chief+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curDiff&&curDiff.marks[it.id];
-  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+'</label>'}).join("")+'</div>':'')+staff+
+  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?"× "+esc(it.qty):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'')+'</label>'}).join("")+'</div>':'')+staff+
   ((b.note||"").trim()?'<p class="cat-note'+(curDiff&&curDiff.marks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
 }
 function staffEdit(hid,c,b){var st=b.staff||[],at=function(i){return ' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"'};
@@ -446,6 +462,7 @@ function datalists(){return CATS.map(function(c){return '<datalist id="dl-'+c.id
 function modalView(){
  if(!modal)return "";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
+ if(modal.t==="me")return wrap('<h2>Как вас зовут?</h2><p class="hint">Имя будет видно рядом с вашими отметками «сделано», чтобы все понимали, кто что выполнил.</p><form id="me-form" class="halls-row"><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(ls.get("tz-me")||"")+'"><div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div></form>',"Ваше имя");
  if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(CATS.map(function(c){return {d:c.id,n:c.name}}));
   return wrap('<h2>Ссылки для техников</h2><p class="hint">Ссылка отдела сразу открывает только его блоки. Техник может переключить отдел сам.</p><div class="linkopts">'+opts.map(function(o){var u=linkFor(modal.id,o.d),iid="lk-"+(o.d||"all");
    return '<div class="linkopt"><span class="lo-n">'+esc(o.n)+'</span><input id="'+iid+'" readonly value="'+esc(u)+'" aria-label="Ссылка: '+esc(o.n)+'"><button class="btn sm" data-act="copy-one" data-url="'+esc(u)+'" data-inp="'+iid+'">Копировать</button></div>'}).join("")+'</div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылки")}
@@ -597,11 +614,14 @@ app.addEventListener("click",function(e){
    saveHalls(halls).then(function(ok){if(ok&&modal)modal.halls=clone(state.halls);render()});break;
   case "rm-admin":sb.from("admins").delete().eq("email",d.email).then(function(r){if(r.error)toast("Не удалось: "+r.error.message);loadAdmins().then(render)});break;
   case "theme":var nt=curTheme()==="dark"?"light":"dark";applyTheme(nt);ls.set("tz-theme",nt);render();break;
-  case "close":case "close-bg":modal=null;render();break;
+  case "me":modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30);break;
+  case "me-cancel":pendingCheck=null;modal=null;render();break;
+  case "close":case "close-bg":pendingCheck=null;modal=null;render();break;
  }
 });
 app.addEventListener("submit",function(e){
  e.preventDefault();
+ if(e.target.id==="me-form"){var nm=(document.getElementById("me-in").value||"").trim().replace(/\s+/g," ").slice(0,60);if(!nm)return;ls.set("tz-me",nm);modal=null;var pc=pendingCheck;pendingCheck=null;render();if(pc)setCheck(pc.ev,pc.item,pc.done);else toast("Имя сохранено");return}
  if(e.target.id==="auth-form"){
   var em=(document.getElementById("auth-email").value||"").trim(),pw=document.getElementById("auth-pass"),pw2=document.getElementById("auth-pass2");
   auth.email=em;auth.err="";auth.msg="";
@@ -654,7 +674,7 @@ app.addEventListener("input",function(e){
 app.addEventListener("change",function(e){
  var t=e.target,d=t.dataset;
  if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
- if(d.done){var p=d.done.split("|"),k="tz-done-"+p[0],m=ls.get(k)||{};if(t.checked)m[p[1]]=1;else delete m[p[1]];ls.set(k,m);t.closest(".row").classList.toggle("done",t.checked)}
+ if(d.done){var p=d.done.split("|");if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30)}else setCheck(p[0],p[1],t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
  if(d.upload&&editing&&t.files&&t.files.length){uploadFiles(d.upload,t.files);t.value=""}
 });

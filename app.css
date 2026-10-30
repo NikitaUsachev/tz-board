@@ -318,3 +318,10 @@ a.tel:hover{text-decoration:underline}
 .person-e .rm{border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;border-radius:6px}
 .person-e .rm:hover{color:var(--danger);background:var(--surface-2)}
 .staff-edit .add-item{margin-top:6px}
+/* ---------- shared checks ---------- */
+.row .who{grid-column:2/4;font-size:12px;color:var(--ok);font-family:var(--f-mono)}
+.row.done{background:color-mix(in srgb,var(--ok) 6%,transparent);border-radius:6px}
+.prog{color:var(--muted)}
+.prog.all{color:var(--ok);font-weight:700}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
+.me-line b{color:var(--ink)}
