@@ -325,3 +325,9 @@ a.tel:hover{text-decoration:underline}
 .prog.all{color:var(--ok);font-weight:700}
 .linkbtn{border:0;background:none;padding:0;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
 .me-line b{color:var(--ink)}
+/* ---------- project team ---------- */
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.team-cell{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);min-width:0}
+.team-cell b{font-weight:600;overflow-wrap:anywhere}
+.team-cell b .none{font-weight:400}
+.team-cell input{min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface)}

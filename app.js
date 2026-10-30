@@ -293,7 +293,7 @@ function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x})
 function computeDiff(o,n){
  var out={head:[],cats:{},marks:{},total:0};
  var add=function(k,t){(out.cats[k]=out.cats[k]||[]).push(t);out.total++};
- [["title","Название"],["date","Дата"],["mount","Монтаж"],["rehearsal","Прогоны / репетиции"],["start","Начало"],["end","Завершение"],["status","Статус"],["notes","Примечания"]].forEach(function(f){
+ [["title","Название"],["date","Дата"],["mount","Монтаж"],["rehearsal","Прогоны / репетиции"],["start","Начало"],["end","Завершение"],["status","Статус"],["manager","Менеджер проекта"],["padmin","Администратор проекта"],["notes","Примечания"]].forEach(function(f){
   var a=(o[f[0]]||"").trim?String(o[f[0]]||"").trim():"",b=String(n[f[0]]||"").trim();if(a===b)return;
   var v=f[0]==="date"?(fmtDate(b,{day:"numeric",month:"long"})||"—"):f[0]==="status"?stName(b):f[0]==="notes"?"изменены":(b||"—");
   out.head.push(f[1]+": "+(f[0]==="notes"?v:(f[0]==="date"||f[0]==="status"||!a?"":(a+" → "))+v));out.total++});
@@ -384,6 +384,11 @@ function headView(ev,isEdit){
   h+=halls.length?halls.map(function(x){return '<button class="hall-chip" data-act="jump" data-h="'+x.id+'">'+esc(x.name)+'</button>'}).join(""):'<span class="none">Не выбран</span>';
  }
  h+='</div></div>';
+ if(isEdit)h+='<div class="team"><label class="team-cell"><span class="eyebrow">Менеджер проекта</span><input id="f-manager" data-f="manager" value="'+esc(ev.manager)+'" placeholder="Фамилия Имя" autocomplete="off"></label>'+
+  '<label class="team-cell"><span class="eyebrow">Администратор проекта</span><input id="f-padmin" data-f="padmin" value="'+esc(ev.padmin)+'" placeholder="Фамилия Имя (если есть)" autocomplete="off"></label></div>';
+ else{var mg=(ev.manager||"").trim(),pa=(ev.padmin||"").trim();
+  h+='<div class="team"><div class="team-cell"><span class="eyebrow">Менеджер проекта</span><b>'+(mg?esc(mg):'<span class="none">Не указан</span>')+'</b></div>'+
+   (pa?'<div class="team-cell"><span class="eyebrow">Администратор проекта</span><b>'+esc(pa)+'</b></div>':'')+'</div>'}
  if(isEdit)h+='<label class="halls-row"><span class="eyebrow">Общие примечания</span><textarea id="f-notes" data-f="notes" placeholder="Контакты, доступ на площадку, особые условия">'+esc(ev.notes)+'</textarea></label>';
  else if((ev.notes||"").trim())h+='<div class="halls-row"><span class="eyebrow">Примечания</span><p class="notes">'+esc(ev.notes)+'</p></div>';
  var docs=ev.docs||{};
