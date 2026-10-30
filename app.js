@@ -297,7 +297,7 @@ function modalView(){
 
 /* ---------- auth screen ---------- */
 var AUTH_ERR={"Invalid login credentials":"Неверная почта или пароль.","Email not confirmed":"Почта ещё не подтверждена. Откройте письмо от Supabase и нажмите ссылку подтверждения.","User already registered":"Этот адрес уже зарегистрирован. Войдите или восстановите пароль.","Password should be at least 6 characters.":"Пароль слишком короткий."};
-function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m])return AUTH_ERR[m];if(/rate|limit|seconds/i.test(m))return "Слишком много попыток. Подождите минуту и попробуйте снова.";return m}
+function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m])return AUTH_ERR[m];if(/email rate limit/i.test(m))return "Лимит писем исчерпан: бесплатная почта сервиса отправляет не больше 2 писем в час на весь сайт. Попробуйте через час или попросите администратора.";if(/rate|limit|seconds/i.test(m))return "Слишком много попыток. Подождите минуту и попробуйте снова.";return m}
 function authView(){
  var h='<div class="auth gut"><div class="auth-top">'+themeBtn()+'</div><div class="auth-card"><div class="auth-brand"><span class="eyebrow">Техническое обеспечение мероприятий</span><h1>ТЗ на мероприятия</h1></div>';
  if(session&&!isAdmin){
