@@ -50,7 +50,7 @@ function fmtSize(n){if(!n&&n!==0)return "";if(n<1024)return n+" Б";if(n<1048576
 function fileExt(name){var m=/\.([a-z0-9]{1,6})$/i.exec(name||"");return m?m[1].toLowerCase():""}
 function isImg(f){return /^(png|jpe?g|webp|gif)$/.test(fileExt(f.name))}
 function fileUrl(f){return f.path?sb.storage.from(BUCKET).getPublicUrl(f.path).data.publicUrl:""}
-var DOCS=[{id:"tech",name:"Технический сценарий"},{id:"director",name:"Режиссёрский сценарий"}];
+var DOCS=[{id:"tech",name:"Технический сценарий"},{id:"director",name:"Режиссёрский сценарий"},{id:"scheme",name:"Общая схема",accept:".pdf,.png,.jpg,.jpeg,.webp,.gif,.vwx,.dwg,.dxf,.mvr,.zip"}];
 var DOC_ACCEPT=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.rtf,.txt,.png,.jpg,.jpeg,.webp,.zip";
 function fileLists(ev){var out=[];if(!ev)return out;Object.keys(ev.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=ev.blocks[h][c.id];if(b&&b.files)out.push(b.files)})});DOCS.forEach(function(d){if(ev.docs&&ev.docs[d.id])out.push(ev.docs[d.id])});return out}
 function allPaths(ev){var out=[];fileLists(ev).forEach(function(l){l.forEach(function(f){if(f.path)out.push(f.path)})});return out}
@@ -394,7 +394,7 @@ function headView(ev,isEdit){
  if(isEdit)h+='<label class="halls-row"><span class="eyebrow">Общие примечания</span><textarea id="f-notes" data-f="notes" placeholder="Контакты, доступ на площадку, особые условия">'+esc(ev.notes)+'</textarea></label>';
  else if((ev.notes||"").trim())h+='<div class="halls-row"><span class="eyebrow">Примечания</span><p class="notes">'+esc(ev.notes)+'</p></div>';
  var docs=ev.docs||{};
- if(isEdit)h+='<div class="docs">'+DOCS.map(function(d){return filesEdit(docs[d.id],d.name,"d|"+d.id,DOC_ACCEPT,"+ Загрузить","")}).join("")+'</div><p class="hint">PDF, Word, Excel, PowerPoint, изображения · до 50 МБ на файл</p>';
+ if(isEdit)h+='<div class="docs">'+DOCS.map(function(d){return filesEdit(docs[d.id],d.name,"d|"+d.id,d.accept||DOC_ACCEPT,"+ Загрузить","")}).join("")+'</div><p class="hint">Сценарии: PDF, Word, Excel, PowerPoint, изображения · Схема: PDF, изображения, Vectorworks, DWG, MVR · до 50 МБ на файл</p>';
  else{var dh=DOCS.map(function(d){return filesRead(docs[d.id],d.name)}).join("");if(dh)h+='<div class="docs">'+dh+'</div>'}
  if(!isEdit&&ev.updatedAt)h+='<p class="hint">Обновлено '+esc(new Date(ev.updatedAt).toLocaleString("ru-RU",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"}))+(isAdmin&&ev.updatedBy?" · "+esc(ev.updatedBy):"")+'</p>';
  return h+'</header>';
