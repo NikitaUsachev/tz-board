@@ -389,3 +389,10 @@ h4 .req-n{vertical-align:2px}
 .req-rej summary{cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:8px}
 .req-state{padding:12px 14px;border-radius:10px;background:var(--accent-soft);margin:0}
 .req-state.rej{background:color-mix(in srgb,var(--danger) 12%,transparent)}
+/* ---------- hall purpose ---------- */
+.hall-role{font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:99px;white-space:nowrap;align-self:center}
+.hall-h-edit{flex-wrap:wrap;align-items:center}
+.hall-role-in{flex:1 1 220px;min-width:0;max-width:360px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:14px}
+.hc-role{margin-left:6px;color:var(--muted);font-weight:400}
+.hc-role::before{content:"· "}
+@media (max-width:560px){.hall-role{font-size:12px;padding:2px 8px}}
