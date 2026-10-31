@@ -184,7 +184,7 @@ function setCheck(evid,item,done){
 }
 setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
 var reloadT;
-function scheduleReload(){clearTimeout(reloadT);reloadT=setTimeout(function(){if(isAdmin)loadAll();else if(route())loadTech(route())},400)}
+function scheduleReload(){clearTimeout(reloadT);reloadT=setTimeout(function(){if(isAdmin){loadAll();loadRequests().then(function(){if(!editing&&!modal)render()})}else if(route())loadTech(route())},400)}
 function subscribe(){
  if(rtChannel)return;
  try{rtChannel=sb.channel("tz").on("postgres_changes",{event:"*",schema:"public",table:"events"},scheduleReload)
@@ -195,11 +195,27 @@ function checkAdmin(){
  var p=session?sb.rpc("is_admin").then(function(r){isAdmin=!!r.data}):Promise.resolve(isAdmin=false);
  return p.then(function(){
   authReady=true;loaded=false;
-  if(isAdmin){subscribe();return Promise.all([loadAll(),loadAdmins()]).then(render)}
+  if(isAdmin){subscribe();return Promise.all([loadAll(),loadAdmins(),loadRequests()]).then(render)}
+  if(session)sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()});
   unsubscribe();admins=[];state.events=[];versions={};editing=null;
   if(route())return loadTech(route());
   loaded=true;render();
  });
+}
+var requests=[],reqStatus="";
+function loadRequests(){return sb.rpc("list_admin_requests").then(function(r){if(!r.error)requests=r.data||[]})}
+function pendingCount(){return requests.filter(function(x){return !x.rejected}).length}
+function fmtDT(t){var d=new Date(t);return isNaN(d)?"":d.toLocaleString("ru-RU",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+function decideRequest(email,accept){sb.rpc("decide_admin_request",{p_email:email,p_accept:accept}).then(function(r){
+ if(r.error){toast("Не удалось: "+r.error.message);return}
+ toast(accept?email+" теперь администратор":"Заявка "+email+" отклонена");Promise.all([loadAdmins(),loadRequests()]).then(render)})}
+function requestsView(){
+ var pend=requests.filter(function(x){return !x.rejected}),rej=requests.filter(function(x){return x.rejected});
+ var row=function(x,isRej){return '<div class="req"><div class="req-i"><b>'+esc(x.email)+'</b><span class="hint">Регистрация '+esc(fmtDT(x.created_at))+' · '+(x.confirmed?'почта подтверждена':'почта не подтверждена')+(x.last_sign_in?' · вход '+esc(fmtDT(x.last_sign_in)):'')+'</span></div>'+
+  '<div class="req-b"><button class="btn sm primary" data-act="req-accept" data-email="'+esc(x.email)+'">Принять</button>'+(isRej?'':'<button class="btn sm" data-act="req-reject" data-email="'+esc(x.email)+'">Отклонить</button>')+'</div></div>'};
+ return '<h4>Заявки на доступ'+(pend.length?' <span class="req-n">'+pend.length+'</span>':'')+'</h4>'+
+  (pend.length?'<div class="reqs">'+pend.map(function(x){return row(x,false)}).join("")+'</div>':'<p class="hint">Новых заявок нет. Заявка появляется, когда человек регистрируется на сайте.</p>')+
+  (rej.length?'<details class="req-rej"><summary>Отклонённые ('+rej.length+')</summary><div class="reqs">'+rej.map(function(x){return row(x,true)}).join("")+'</div></details>':'');
 }
 function loadAdmins(){return sb.from("admins").select("email").order("email").then(function(r){admins=(r.data||[]).map(function(x){return x.email})})}
 function cleanEvent(ev){var e=clone(ev);delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});var sk=Object.keys(b.spec).filter(function(k){return k!=="id"});if(!sk.length)delete b.spec;else if(!b.spec.id)b.spec.id=uid()}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
@@ -257,7 +273,7 @@ function topBar(){
  return '<header class="top"><div class="top-in gut">'+
   '<div class="brand"><h1>ТЗ на мероприятия</h1>'+mode+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
-  (isAdmin?'<button class="btn" data-act="settings">Настройки</button>':'')+
+  (isAdmin?'<button class="btn" data-act="settings">Настройки'+(pendingCount()?'<span class="req-n" aria-label="Новых заявок: '+pendingCount()+'">'+pendingCount()+'</span>':'')+'</button>':'')+
   (isAdmin&&onBoard?'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'')+
   themeBtn()+auth+
  '</div></header>'+conflictBanner();
@@ -541,10 +557,10 @@ function modalView(){
    '</div><button class="btn sm" data-act="add-hall" style="align-self:flex-start">+ Добавить зал</button>'+
    '<p class="hint">Переименование зала обновит его во всех ТЗ. Если удалить зал, его блоки скроются из ТЗ.</p>'+
    '<div class="bar"><span class="sp"></span><button class="btn primary" data-act="save-settings">Сохранить залы</button></div>'+
-   '<h4>Администраторы</h4><div style="display:flex;flex-direction:column;gap:6px">'+admins.map(function(a){var me=a.toLowerCase()===myEmail().toLowerCase();
+   requestsView()+'<h4>Администраторы</h4><div style="display:flex;flex-direction:column;gap:6px">'+admins.map(function(a){var me=a.toLowerCase()===myEmail().toLowerCase();
     return '<div class="hl"><span style="flex:1;min-width:0;overflow-wrap:anywhere">'+esc(a)+'</span>'+(me?'<span class="use">это вы</span>':'<button class="btn ghost sm danger" data-act="rm-admin" data-email="'+esc(a)+'" aria-label="Убрать администратора">×</button>')+'</div>'}).join("")+'</div>'+
    '<form id="admin-form" class="hl"><input id="admin-email" type="email" required placeholder="email нового администратора"><button type="submit" class="btn sm">Добавить</button></form>'+
-   '<p class="hint">Порядок такой: коллега регистрируется на <b class="mono" style="overflow-wrap:anywhere">'+esc(homeLink())+'</b> (почта и пароль), а вы добавляете его email сюда. Без этого он увидит только экран ожидания.</p>'+
+   '<p class="hint">Коллега регистрируется на <b class="mono" style="overflow-wrap:anywhere">'+esc(homeLink())+'</b> (почта и пароль), и его заявка появляется выше в «Заявках на доступ». Можно и сразу вписать email вручную.</p>'+
    '<div class="bar"><span class="sp"></span><button class="btn" data-act="close">Закрыть</button></div>',"Настройки");
  }
  return "";
@@ -556,7 +572,7 @@ function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m]
 function authView(){
  var h='<div class="auth gut"><div class="auth-top">'+themeBtn()+'</div><div class="auth-card"><div class="auth-brand"><span class="eyebrow">Техническое обеспечение мероприятий</span><h1>ТЗ на мероприятия</h1></div>';
  if(session&&!isAdmin){
-  h+='<p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p><p class="hint">Этого адреса пока нет в списке администраторов. Попросите администратора добавить его: «Настройки» → «Администраторы», затем нажмите «Проверить снова».</p>'+
+  h+='<p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+(reqStatus==="rejected"?'<p class="req-state rej"><b>Заявка отклонена.</b> Если это ошибка, свяжитесь с администратором.</p>':'<p class="req-state"><b>Заявка отправлена.</b> Администратор увидит её в «Настройках» и подтвердит доступ. После этого нажмите «Проверить снова».</p>')+''+
    '<div class="bar"><button class="btn danger" data-act="logout">Выйти</button><span class="sp"></span><button class="btn primary" data-act="recheck">Проверить снова</button></div>';
  }else{
   var t=auth.tab;
@@ -667,7 +683,9 @@ app.addEventListener("click",function(e){
   case "rm-item":editing.blocks[d.h][d.c].items.splice(+d.i,1);dirty=true;render();break;
   case "mv-up":case "mv-down":var to=+d.i+(a==="mv-up"?-1:1);moveItem(d.h,d.c,+d.i,to);
    var bt=document.querySelector('[data-act="'+a+'"][data-h="'+d.h+'"][data-c="'+d.c+'"][data-i="'+to+'"]');if(bt&&!bt.disabled)bt.focus();break;
-  case "settings":pickerOpen=false;modal={t:"settings",halls:clone(state.halls)};render();loadAdmins().then(render);break;
+  case "settings":pickerOpen=false;modal={t:"settings",halls:clone(state.halls)};render();Promise.all([loadAdmins(),loadRequests()]).then(render);break;
+  case "req-accept":decideRequest(d.email,true);break;
+  case "req-reject":decideRequest(d.email,false);break;
   case "add-hall":modal.halls.push({id:"h"+uid(),name:"Новый зал"});render();var ins=document.querySelectorAll("[data-hallname]");if(ins.length){ins[ins.length-1].focus();ins[ins.length-1].select()}break;
   case "rm-hall":modal.halls.splice(+d.i,1);render();break;
   case "mv-hall":moveHall(+d.i,+d.to);var hb=document.querySelector('[data-act="mv-hall"][data-i="'+d.to+'"][data-to="'+(2*(+d.to)-(+d.i))+'"]');if(hb&&!hb.disabled)hb.focus();break;

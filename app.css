@@ -376,3 +376,16 @@ a.tel:hover{text-decoration:underline}
 .seg-mini{display:flex;flex-wrap:wrap;gap:2px 10px}
 .seg-mini .linkbtn{text-decoration:none;color:var(--muted);border-bottom:1px dashed transparent}
 .seg-mini .linkbtn.on{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}
+/* ---------- admin requests ---------- */
+.req-n{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:99px;background:var(--danger);color:#fff;font-size:12px;font-weight:700;line-height:1;vertical-align:1px}
+h4 .req-n{vertical-align:2px}
+.reqs{display:flex;flex-direction:column;gap:8px}
+.req{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.req-i{display:flex;flex-direction:column;gap:2px;flex:1 1 220px;min-width:0}
+.req-i b{overflow-wrap:anywhere}
+.req-i .hint{margin:0;font-size:12.5px}
+.req-b{display:flex;gap:6px}
+.req-rej{margin-top:8px}
+.req-rej summary{cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:8px}
+.req-state{padding:12px 14px;border-radius:10px;background:var(--accent-soft);margin:0}
+.req-state.rej{background:color-mix(in srgb,var(--danger) 12%,transparent)}
