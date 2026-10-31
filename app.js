@@ -390,6 +390,19 @@ function sheetBar(ev,isEdit){
  }
  return h+'</div>';
 }
+function factList(ev){
+ var dl=function(d){return fmtDate(d,{day:"numeric",month:"long"})+", "+fmtDate(d,{weekday:window.innerWidth<480?"short":"long"})};
+ var rows=[],mg=(ev.manager||"").trim(),pa=(ev.padmin||"").trim();
+ if(ev.mountDate)rows.push(["Монтажный день",dl(ev.mountDate)+(ev.mount?" · с "+ev.mount:""),"txt"]);
+ else if(ev.mount)rows.push(["Монтаж с",ev.mount,""]);
+ rows.push(["Проведение мероприятия",ev.date?dl(ev.date):"",  "txt"]);
+ rows.push(["Прогоны / репетиции с",ev.rehearsal||"",""]);
+ if(ev.start)rows.push(["Начало мероприятия",ev.start,""]);
+ rows.push(["Завершение",ev.end||"",""]);
+ rows.push(["Менеджер проекта",mg,"txt"]);
+ if(pa)rows.push(["Администратор проекта",pa,"txt"]);
+ return '<dl class="flist">'+rows.map(function(r){return '<div class="frow"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';
+}
 function factCell(label,key,val,type,isEdit,extra){
  if(isEdit)return '<label class="fact"><span class="eyebrow">'+label+'</span><input id="f-'+key+'" type="'+type+'" data-f="'+key+'" value="'+esc(val||"")+'">'+(key==="mountDate"?'<span class="fact-act"><button type="button" class="linkbtn" data-act="mount-eve">накануне</button>'+(val?' · <button type="button" class="linkbtn" data-act="mount-clear">очистить</button>':'')+'</span>':'')+'</label>';
  return '<div class="fact"><span class="eyebrow">'+label+'</span><span class="v'+(extra||"")+(val?"":" dim")+'">'+(val?esc(type==="date"?fmtDate(val,{day:"numeric",month:"long",year:"numeric"}):val):"—")+'</span>'+(type==="date"&&val?'<span class="eyebrow">'+esc(fmtDate(val,{weekday:"long"}))+'</span>':'')+'</div>';
@@ -401,7 +414,8 @@ function headView(ev,isEdit){
  else{h+='<span class="pill st-'+esc(ev.status)+'">'+esc(stName(ev.status))+'</span><h2>'+esc(ev.title||"Без названия")+'</h2>'}
  var showMount=isEdit||ev.mount, showStart=isEdit||ev.start;
  var showMD=isEdit||ev.mountDate;
- h+='<div class="facts">'+(showMD?factCell("Монтажный день","mountDate",ev.mountDate,"date",isEdit," txt"):"")+
+ if(!isEdit)h+=factList(ev);
+ else h+='<div class="facts">'+(showMD?factCell("Монтажный день","mountDate",ev.mountDate,"date",isEdit," txt"):"")+
   (showMount?factCell("Монтаж с","mount",ev.mount,"time",isEdit):"")+
   factCell("Проведение мероприятия","date",ev.date,"date",isEdit," txt")+
   factCell("Прогоны / репетиции с","rehearsal",ev.rehearsal,"time",isEdit)+
@@ -417,9 +431,6 @@ function headView(ev,isEdit){
  h+='</div></div>';
  if(isEdit)h+='<div class="team"><label class="team-cell"><span class="eyebrow">Менеджер проекта</span><input id="f-manager" data-f="manager" value="'+esc(ev.manager)+'" placeholder="Фамилия Имя" autocomplete="off"></label>'+
   '<label class="team-cell"><span class="eyebrow">Администратор проекта</span><input id="f-padmin" data-f="padmin" value="'+esc(ev.padmin)+'" placeholder="Фамилия Имя (если есть)" autocomplete="off"></label></div>';
- else{var mg=(ev.manager||"").trim(),pa=(ev.padmin||"").trim();
-  h+='<div class="team"><div class="team-cell"><span class="eyebrow">Менеджер проекта</span><b>'+(mg?esc(mg):'<span class="none">Не указан</span>')+'</b></div>'+
-   (pa?'<div class="team-cell"><span class="eyebrow">Администратор проекта</span><b>'+esc(pa)+'</b></div>':'')+'</div>'}
  if(isEdit)h+='<label class="halls-row"><span class="eyebrow">Общие примечания</span><textarea id="f-notes" data-f="notes" placeholder="Контакты, доступ на площадку, особые условия">'+esc(ev.notes)+'</textarea></label>';
  else if((ev.notes||"").trim())h+='<div class="halls-row"><span class="eyebrow">Примечания</span><p class="notes">'+esc(ev.notes)+'</p></div>';
  var docs=ev.docs||{};
