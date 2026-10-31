@@ -286,7 +286,7 @@ function boardView(){
 }
 function cardView(e){
  var halls=evHalls(e);
- var time=[e.mountDate&&e.mountDate!==e.date?"Монтаж "+fmtDate(e.mountDate,{day:"2-digit",month:"2-digit"}):"",e.rehearsal?"Прогоны с "+e.rehearsal:"",e.end?"до "+e.end:""].filter(Boolean).join(" · ");
+ var time=[e.mountDate&&e.mountDate!==e.date?"Монтаж "+fmtDate(e.mountDate,{day:"2-digit",month:"2-digit"}):"",e.rehearsal?"Прогоны "+(e.rehearsalDay==="mount"&&e.mountDate?fmtDate(e.mountDate,{day:"2-digit",month:"2-digit"})+" ":"с ")+e.rehearsal:"",e.end?"до "+e.end:""].filter(Boolean).join(" · ");
  return '<a class="card" href="#ev-'+esc(e.id)+'" data-card="'+esc(e.id)+'"'+(isAdmin?' draggable="true"':'')+'>'+
   '<div class="card-date"><span class="d">'+(e.date?esc(fmtDate(e.date,{day:"2-digit",month:"2-digit",year:"numeric"})):"Дата не указана")+'</span><span class="w">'+esc(e.date?fmtDate(e.date,{weekday:"short"}):"")+'</span>'+(isPast(e.date)&&e.status!=="done"?'<span class="past">прошло</span>':'')+'</div>'+
   '<h3>'+esc(e.title||"Без названия")+'</h3>'+
@@ -314,10 +314,10 @@ function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x})
 function computeDiff(o,n){
  var out={head:[],cats:{},marks:{},mk:{},total:0};
  var add=function(k,t){(out.cats[k]=out.cats[k]||[]).push(t);out.total++};
- [["title","Название"],["mountDate","Монтажный день"],["date","Проведение мероприятия"],["mount","Монтаж с"],["rehearsal","Прогоны / репетиции"],["start","Начало"],["end","Завершение"],["status","Статус"],["manager","Менеджер проекта"],["padmin","Администратор проекта"],["notes","Примечания"]].forEach(function(f){
+ [["title","Название"],["mountDate","Монтажный день"],["date","Проведение мероприятия"],["mount","Монтаж с"],["rehearsal","Прогоны / репетиции"],["rehearsalDay","Прогоны"],["start","Начало"],["end","Завершение"],["status","Статус"],["manager","Менеджер проекта"],["padmin","Администратор проекта"],["notes","Примечания"]].forEach(function(f){
   var a=(o[f[0]]||"").trim?String(o[f[0]]||"").trim():"",b=String(n[f[0]]||"").trim();if(a===b)return;
-  var v=(f[0]==="date"||f[0]==="mountDate")?(fmtDate(b,{day:"numeric",month:"long"})||"—"):f[0]==="status"?stName(b):f[0]==="notes"?"изменены":(b||"—");
-  out.head.push(f[1]+": "+(f[0]==="notes"?v:(f[0]==="date"||f[0]==="mountDate"||f[0]==="status"||!a?"":(a+" → "))+v));out.total++});
+  var v=f[0]==="rehearsalDay"?(b==="mount"?"в монтажный день":"в день мероприятия"):(f[0]==="date"||f[0]==="mountDate")?(fmtDate(b,{day:"numeric",month:"long"})||"—"):f[0]==="status"?stName(b):f[0]==="notes"?"изменены":(b||"—");
+  out.head.push(f[1]+": "+(f[0]==="notes"?v:(f[0]==="date"||f[0]==="mountDate"||f[0]==="rehearsalDay"||f[0]==="status"||!a?"":(a+" → "))+v));out.total++});
  (n.halls||[]).forEach(function(h){if((o.halls||[]).indexOf(h)<0){var x=hallById(h);out.head.push("Добавлен зал: "+(x?x.name:h));out.total++}});
  (o.halls||[]).forEach(function(h){if((n.halls||[]).indexOf(h)<0){var x=hallById(h);out.head.push("Убран зал: "+(x?x.name:h));out.total++}});
  DOCS.forEach(function(d){var A=byId((o.docs||{})[d.id]),B=(n.docs||{})[d.id]||[];
@@ -396,7 +396,8 @@ function factList(ev){
  if(ev.mountDate)rows.push(["Монтажный день",dl(ev.mountDate)+(ev.mount?" · с "+ev.mount:""),"txt"]);
  else if(ev.mount)rows.push(["Монтаж с",ev.mount,""]);
  rows.push(["Проведение мероприятия",ev.date?dl(ev.date):"",  "txt"]);
- rows.push(["Прогоны / репетиции с",ev.rehearsal||"",""]);
+ var rm=ev.rehearsalDay==="mount"&&ev.mountDate;
+ rows.push(["Прогоны / репетиции с",ev.rehearsal?(rm?dl(ev.mountDate)+" · "+ev.rehearsal:ev.rehearsal):(rm?dl(ev.mountDate):""),rm?"txt":""]);
  if(ev.start)rows.push(["Начало мероприятия",ev.start,""]);
  rows.push(["Завершение",ev.end||"",""]);
  rows.push(["Менеджер проекта",mg,"txt"]);
@@ -404,7 +405,7 @@ function factList(ev){
  return '<dl class="flist">'+rows.map(function(r){return '<div class="frow"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';
 }
 function factCell(label,key,val,type,isEdit,extra){
- if(isEdit)return '<label class="fact"><span class="eyebrow">'+label+'</span><input id="f-'+key+'" type="'+type+'" data-f="'+key+'" value="'+esc(val||"")+'">'+(key==="mountDate"?'<span class="fact-act"><button type="button" class="linkbtn" data-act="mount-eve">накануне</button>'+(val?' · <button type="button" class="linkbtn" data-act="mount-clear">очистить</button>':'')+'</span>':'')+'</label>';
+ if(isEdit)return '<label class="fact"><span class="eyebrow">'+label+'</span><input id="f-'+key+'" type="'+type+'" data-f="'+key+'" value="'+esc(val||"")+'">'+(key==="rehearsal"&&editing&&editing.mountDate?'<span class="fact-act seg-mini"><button type="button" class="linkbtn'+(editing.rehearsalDay!=="mount"?" on":"")+'" data-act="reh-day" data-v="">в день мероприятия</button><button type="button" class="linkbtn'+(editing.rehearsalDay==="mount"?" on":"")+'" data-act="reh-day" data-v="mount">в монтажный день</button></span>':'')+(key==="mountDate"?'<span class="fact-act"><button type="button" class="linkbtn" data-act="mount-eve">накануне</button>'+(val?' · <button type="button" class="linkbtn" data-act="mount-clear">очистить</button>':'')+'</span>':'')+'</label>';
  return '<div class="fact"><span class="eyebrow">'+label+'</span><span class="v'+(extra||"")+(val?"":" dim")+'">'+(val?esc(type==="date"?fmtDate(val,{day:"numeric",month:"long",year:"numeric"}):val):"—")+'</span>'+(type==="date"&&val?'<span class="eyebrow">'+esc(fmtDate(val,{weekday:"long"}))+'</span>':'')+'</div>';
 }
 function headView(ev,isEdit){
@@ -677,7 +678,8 @@ app.addEventListener("click",function(e){
   case "me":modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30);break;
   case "me-cancel":pendingCheck=null;modal=null;render();break;
   case "mount-eve":if(editing){if(!editing.date){toast("Сначала укажите дату проведения");break}var md=new Date(editing.date+"T00:00:00");md.setDate(md.getDate()-1);editing.mountDate=md.getFullYear()+"-"+String(md.getMonth()+1).padStart(2,"0")+"-"+String(md.getDate()).padStart(2,"0");dirty=true;render()}break;
-  case "mount-clear":if(editing){editing.mountDate="";dirty=true;render()}break;
+  case "mount-clear":if(editing){editing.mountDate="";editing.rehearsalDay="";dirty=true;render()}break;
+  case "reh-day":if(editing){editing.rehearsalDay=d.v||"";dirty=true;render()}break;
   case "close":case "close-bg":pendingCheck=null;modal=null;render();break;
  }
 });

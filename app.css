@@ -373,3 +373,6 @@ a.tel:hover{text-decoration:underline}
 .frow dd.m{font-family:var(--f-mono);font-weight:700}
 .frow dd.dim{color:var(--muted);font-weight:500}
 @media (max-width:420px){.frow dt{font-size:13px}.frow dd{font-size:14px}}
+.seg-mini{display:flex;flex-wrap:wrap;gap:2px 10px}
+.seg-mini .linkbtn{text-decoration:none;color:var(--muted);border-bottom:1px dashed transparent}
+.seg-mini .linkbtn.on{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}
