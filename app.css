@@ -172,7 +172,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .hl{display:flex;gap:6px;align-items:center}
 .hl input,.dlg .full{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);width:100%}
 .hl .use{font-size:12px;color:var(--muted);white-space:nowrap}
-.hrow{display:grid;grid-template-columns:22px minmax(0,1fr) auto 60px 32px;gap:6px;align-items:center;border-radius:8px}
+.hrow{display:grid;grid-template-columns:22px minmax(0,1fr) 60px 32px;gap:6px;align-items:center;border-radius:8px}
 .hrow .use{min-width:44px;text-align:right}
 .hrow .grip{align-self:stretch;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:grab;border-radius:6px;font-size:15px;letter-spacing:-2px;user-select:none;-webkit-user-select:none}
 .hrow .grip:hover{background:var(--surface-2);color:var(--accent)}

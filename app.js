@@ -551,7 +551,7 @@ function modalView(){
   var hs=modal.halls;
   return wrap('<h2>Настройки</h2>'+
    '<h4>Залы</h4><div style="display:flex;flex-direction:column;gap:6px">'+hs.map(function(h,i){var used=state.events.filter(function(e){return (e.halls||[]).indexOf(h.id)>=0}).length;
-    return '<div class="hl hrow" data-hrow="'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="hall-'+h.id+'" data-hallname="'+i+'" value="'+esc(h.name)+'" aria-label="Название зала"><span class="use">'+(used?"в "+used+" ТЗ":"")+'</span>'+
+    return '<div class="hl hrow" data-hrow="'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="hall-'+h.id+'" data-hallname="'+i+'" value="'+esc(h.name)+'" aria-label="Название зала">'+
      '<span class="mv"><button data-act="mv-hall" data-i="'+i+'" data-to="'+(i-1)+'"'+(i===0?" disabled":"")+' aria-label="Переместить выше" title="Выше">↑</button><button data-act="mv-hall" data-i="'+i+'" data-to="'+(i+1)+'"'+(i===hs.length-1?" disabled":"")+' aria-label="Переместить ниже" title="Ниже">↓</button></span>'+
      '<button class="btn ghost sm danger" data-act="rm-hall" data-i="'+i+'" aria-label="Удалить зал">×</button></div>'}).join("")+
    '</div><button class="btn sm" data-act="add-hall" style="align-self:flex-start">+ Добавить зал</button>'+
