@@ -396,3 +396,24 @@ h4 .req-n{vertical-align:2px}
 .hc-role{margin-left:6px;color:var(--muted);font-weight:400}
 .hc-role::before{content:"· "}
 @media (max-width:560px){.hall-role{font-size:12px;padding:2px 8px}}
+
+/* Administrator version and release history */
+#app.admin-layout{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.admin-layout>.board-wrap{flex:1}
+.admin-footer{padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px));text-align:center;color:var(--muted)}
+.version-link{font:inherit;font-size:12px;color:var(--muted);border:0;border-radius:7px;background:transparent;cursor:pointer;padding:8px 12px;min-height:36px}
+.version-link:hover{color:var(--accent);background:var(--accent-soft)}
+.release-dialog{max-width:680px}
+.release-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.release-heading h2{margin:0}
+.release-heading .btn{min-width:36px;min-height:36px}
+.release-history{display:flex;flex-direction:column;gap:22px}
+.release-entry{padding-top:18px;border-top:1px solid var(--line)}
+.release-meta{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.release-version{font-weight:700;color:var(--ink)}
+.release-current{background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:99px}
+.release-entry h3{font-size:18px;line-height:1.35;margin:10px 0 14px}
+.release-entry h4{font-size:14px;margin:14px 0 6px}
+.release-entry ul{padding-left:20px;margin:0}
+.release-entry li{margin:0 0 8px;line-height:1.55;overflow-wrap:anywhere}
+@media(max-width:560px){.release-overlay{padding-block:16px}.release-dialog{padding:18px 16px}.release-entry h3{font-size:17px}}

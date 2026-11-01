@@ -20,6 +20,27 @@ var editingBase=null, settingsData={}, settingsStamp=null, allRequest=0, techReq
 var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pickerOpen=false, modal=null, exitArmed=false, delArmed=false, conflict=null, busy=false;
 var app=document.getElementById("app");
 
+var RELEASES=[
+ {version:"27",date:"1 ноября 2026",title:"История обновлений под рукой",groups:[
+  {title:"Новое",items:["Внизу страницы администратора появился номер версии. Нажмите на него, чтобы узнать, что изменилось.","В этом окне собраны изменения по версиям: новые возможности и исправления простыми словами."]}
+ ]},
+ {version:"26",date:"1 ноября 2026",title:"Надёжнее при совместной работе",groups:[
+  {title:"Совместная работа",items:["Перемещение карточки в другой статус больше не затирает свежие правки коллеги. Если ТЗ уже изменилось, появится сообщение с просьбой повторить действие.","При одновременном изменении списка залов приложение предупредит о конфликте и сохранит ваши поля в открытом окне."]},
+  {title:"Отметки выполнения",items:["Если изменить название, количество или комментарий уже выполненного пункта, его нужно отметить заново.","Перестановка пунктов не сбрасывает отметки. Изменение параметров сцены требует повторного подтверждения.","Повторное нажатие во время сохранения не отправляет вторую отметку. Если сохранение не удалось, приложение сообщит об этом."]},
+  {title:"Файлы и удобство",items:["Исправлена загрузка файлов при переходе между разными ТЗ.","Сохранённые файлы больше не удаляются автоматически из хранилища: это защищает вложения в копиях ТЗ. Убрать вложение со страницы по-прежнему можно.","Исправлена ошибка при перетаскивании залов.","Запоздавшая загрузка предыдущего ТЗ больше не мешает открыть следующее.","Нельзя удалить из настроек зал, который используется в загруженных ТЗ."]}
+ ]},
+ {version:"24",date:"31 октября 2026",title:"Назначение залов",groups:[
+  {title:"Новое",items:["Для каждого зала в ТЗ можно указать назначение: например, конференция, банкет или регистрация. Можно выбрать подсказку или написать свой вариант.","Назначение видно техникам рядом с залом и в шапке ТЗ. В разных мероприятиях у одного зала могут быть разные назначения.","Изменение назначения попадает в сообщение об обновлении ТЗ."]}
+ ]}
+];
+var APP_VERSION=RELEASES[0].version;
+function adminFooter(){
+ return '<footer class="admin-footer"><button type="button" id="app-version" class="version-link" data-act="releases" aria-haspopup="dialog">Версия '+esc(APP_VERSION)+'<span aria-hidden="true"> · </span><span>Что нового</span></button></footer>';
+}
+function releasesView(){
+ return '<div class="modal gut release-overlay" data-act="close-bg"><section class="dlg release-dialog" role="dialog" aria-modal="true" aria-labelledby="release-title"><div class="release-heading"><h2 id="release-title">Что нового</h2><button type="button" id="release-close" class="btn ghost sm" data-act="close" aria-label="Закрыть историю обновлений">✕</button></div><p class="hint">Новые возможности и исправления. Последнее обновление — сверху.</p><div class="release-history">'+RELEASES.map(function(r){return '<article class="release-entry"><div class="release-meta"><span class="release-version">Версия '+esc(r.version)+'</span><span>'+esc(r.date)+'</span>'+(r.version===APP_VERSION?'<span class="release-current">Текущая</span>':'')+'</div><h3>'+esc(r.title)+'</h3>'+r.groups.map(function(g){return '<h4>'+esc(g.title)+'</h4><ul>'+g.items.map(function(t){return '<li>'+esc(t)+'</li>'}).join("")+'</ul>'}).join("")+'</article>'}).join("")+'</div><div class="bar"><span class="sp"></span><button type="button" class="btn primary" data-act="close">Понятно</button></div></section></div>';
+}
+
 /* ---------- helpers ---------- */
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function uid(){return crypto.randomUUID()}
@@ -572,6 +593,7 @@ function datalists(){return CATS.map(function(c){return '<datalist id="dl-'+c.id
 /* ---------- modals ---------- */
 function modalView(){
  if(!modal)return "";
+ if(modal.t==="releases")return isAdmin?releasesView():"";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
  if(modal.t==="me")return wrap('<h2>Как вас зовут?</h2><p class="hint">Имя будет видно рядом с вашими отметками «сделано», чтобы все понимали, кто что выполнил.</p><form id="me-form" class="halls-row"><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(storedMe())+'"><div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div></form>',"Ваше имя");
  if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(DEPTS.map(function(c){return {d:c.id,n:c.name}}));
@@ -639,7 +661,8 @@ function render(){
  else if(isAdmin)body=id?sheetView(id):boardView();
  else if(id)body=sheetView(id);
  else body=authView();
- app.innerHTML=body+(isAdmin?datalists():'')+modalView();
+ app.classList.toggle("admin-layout",isAdmin&&!id);
+ app.innerHTML=body+(isAdmin&&!id?adminFooter():"")+(isAdmin?datalists():'')+modalView();
  window.scrollTo(0,y);
  if(aid){var el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
 }
@@ -688,6 +711,7 @@ app.addEventListener("click",function(e){
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
+  case "releases":if(isAdmin){modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
   case "recheck":checkAdmin();break;
   case "account":modal={t:"account"};render();break;
   case "logout":sb.auth.signOut().then(function(){modal=null;editing=null;auth.tab="in";if(route()&&isAdmin){history.replaceState(null,"",location.pathname)}toast("Вы вышли")});break;
@@ -745,7 +769,7 @@ app.addEventListener("click",function(e){
   case "mount-eve":if(editing){if(!editing.date){toast("Сначала укажите дату проведения");break}var md=new Date(editing.date+"T00:00:00");md.setDate(md.getDate()-1);editing.mountDate=md.getFullYear()+"-"+String(md.getMonth()+1).padStart(2,"0")+"-"+String(md.getDate()).padStart(2,"0");dirty=true;render()}break;
   case "mount-clear":if(editing){editing.mountDate="";editing.rehearsalDay="";dirty=true;render()}break;
   case "reh-day":if(editing){editing.rehearsalDay=d.v||"";dirty=true;render()}break;
-  case "close":case "close-bg":pendingCheck=null;modal=null;render();break;
+  case "close":case "close-bg":var returnToVersion=modal&&modal.t==="releases";pendingCheck=null;modal=null;render();if(returnToVersion){var vb=document.getElementById("app-version");if(vb)vb.focus()}break;
  }
 });
 app.addEventListener("submit",function(e){
@@ -810,7 +834,7 @@ app.addEventListener("change",function(e){
  if(d.upload&&editing&&t.files&&t.files.length){uploadFiles(d.upload,t.files);t.value=""}
 });
 document.addEventListener("click",function(e){if(pickerOpen&&!e.target.closest(".picker")){pickerOpen=false;render()}});
-document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(modal){modal=null;render()}else if(pickerOpen){pickerOpen=false;render()}}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(modal){var returnToVersion=modal.t==="releases";modal=null;render();if(returnToVersion){var vb=document.getElementById("app-version");if(vb)vb.focus()}}else if(pickerOpen){pickerOpen=false;render()}}});
 window.addEventListener("beforeunload",function(e){if(editing&&dirty){e.preventDefault();e.returnValue=""}});
 
 /* drag & drop cards between columns */
