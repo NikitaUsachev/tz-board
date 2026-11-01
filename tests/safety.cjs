@@ -66,6 +66,7 @@ function drafts(){
 }
 function mergeLists(){
  const {c}=env([row(event())]);let issues=[];const merged=c.mergeChanges({sound:['old'],light:['old']},{sound:['mine'],light:['old']},{sound:['old'],light:['theirs']},[],issues);assert.equal(issues.length,0);assert.deepEqual(JSON.parse(JSON.stringify(merged)),{sound:['mine'],light:['theirs']});
+ assert.equal(c.sameValue([{id:'x',name:'Mic',qty:'2'}],[{qty:'2',name:'Mic',id:'x'}]),true,'JSONB property order must not create a false conflict');
  issues=[];c.mergeChanges(['base'],['mine'],['theirs'],['items'],issues);assert.equal(issues.length,1);
 }
 (async()=>{new vm.Script(source);await merge();await choices();await deletedWhileEditing();await trash();await bookings();drafts();mergeLists();console.log('PASS: independent merge, explicit field choices, no forced overwrite, concurrent delete, trash/restore, room/date checks, local draft recovery')})().catch(e=>{console.error(e);process.exitCode=1});

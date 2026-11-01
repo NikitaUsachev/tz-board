@@ -291,7 +291,11 @@ function saveHalls(halls){
 }
 
 /* ---------- safe editing, merge and recovery ---------- */
-function sameValue(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function sameValue(a,b){
+ if(a===b)return true;if(a===null||b===null||typeof a!==typeof b||typeof a!=="object")return false;
+ if(Array.isArray(a)||Array.isArray(b))return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every(function(x,i){return sameValue(x,b[i])});
+ var ak=Object.keys(a).sort(),bk=Object.keys(b).sort();return ak.length===bk.length&&ak.every(function(k,i){return k===bk[i]&&sameValue(a[k],b[k])});
+}
 function copyValue(x){return x===undefined?undefined:clone(x)}
 function mergeChanges(base,mine,theirs,path,issues){
  if(sameValue(mine,base))return copyValue(theirs);
