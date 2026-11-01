@@ -22,6 +22,20 @@ var app=document.getElementById("app");
 
 var RELEASES=[
   {
+    "version": "28.3",
+    "date": "1 ноября 2026",
+    "title": "Заметное уведомление об обновлении",
+    "groups": [
+      {
+        "title": "История обновлений",
+        "items": [
+          "При появлении новой версии кнопка выделяется цветом и надписью «Новое».",
+          "После открытия истории обновлений кнопка возвращается к обычному виду. Просмотр запоминается отдельно для каждого администратора в этом браузере."
+        ]
+      }
+    ]
+  },
+  {
     "version": "28.2",
     "date": "1 ноября 2026",
     "title": "Понятное название для восстановления правок",
@@ -151,8 +165,12 @@ var RELEASES=[
   }
 ];
 var APP_VERSION=RELEASES[0].version;
+var seenReleaseMemory={};
+function releaseReadKey(){return "tz-release-read-"+myEmail().toLowerCase()}
+function releaseUnread(){var key=releaseReadKey();return (seenReleaseMemory[key]||ls.get(key))!==APP_VERSION}
+function markReleaseRead(){var key=releaseReadKey();seenReleaseMemory[key]=APP_VERSION;ls.set(key,APP_VERSION)}
 function adminFooter(){
- return '<footer class="admin-footer"><button type="button" class="version-link" data-act="drafts">Несохранённые изменения ('+Object.keys(drafts()).length+')</button><button type="button" class="version-link" data-act="trash">Корзина ('+state.events.filter(function(e){return !!e.deletedAt}).length+')</button><button type="button" id="app-version" class="version-link" data-act="releases" aria-haspopup="dialog">Версия '+esc(APP_VERSION)+'<span aria-hidden="true"> · </span><span>Что нового</span></button></footer>';
+ return '<footer class="admin-footer"><button type="button" class="version-link" data-act="drafts">Несохранённые изменения ('+Object.keys(drafts()).length+')</button><button type="button" class="version-link" data-act="trash">Корзина ('+state.events.filter(function(e){return !!e.deletedAt}).length+')</button><button type="button" id="app-version" class="version-link'+(releaseUnread()?' has-update':'')+'" data-act="releases" aria-haspopup="dialog" aria-label="'+(releaseUnread()?'Доступно обновление. ':'')+'Версия '+esc(APP_VERSION)+'. История обновлений">Версия '+esc(APP_VERSION)+(releaseUnread()?'<span class="version-new">Новое</span>':'')+'<span aria-hidden="true"> · </span><span>Что нового</span></button></footer>';
 }
 function releasesView(){
  return '<div class="modal gut release-overlay" data-act="close-bg"><section class="dlg release-dialog" role="dialog" aria-modal="true" aria-labelledby="release-title"><div class="release-heading"><h2 id="release-title">История обновлений</h2><button type="button" id="release-close" class="btn ghost sm" data-act="close" aria-label="Закрыть историю обновлений">✕</button></div><p class="hint">Изменения, которые помогают готовить ТЗ и контролировать выполнение работ. Сначала показаны последние обновления.</p><div class="release-history">'+RELEASES.map(function(r){return '<article class="release-entry"><div class="release-meta"><span class="release-version">Версия '+esc(r.version)+'</span><span>'+esc(r.date)+'</span>'+(r.version===APP_VERSION?'<span class="release-current">Текущая</span>':'')+'</div><h3>'+esc(r.title)+'</h3>'+r.groups.map(function(g){return '<h4>'+esc(g.title)+'</h4><ul>'+g.items.map(function(t){return '<li>'+esc(t)+'</li>'}).join("")+'</ul>'}).join("")+'</article>'}).join("")+'</div><div class="bar"><span class="sp"></span><button type="button" class="btn primary" data-act="close">Понятно</button></div></section></div>';
@@ -912,7 +930,7 @@ app.addEventListener("click",function(e){
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
-  case "releases":if(isAdmin){modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
+  case "releases":if(isAdmin){markReleaseRead();modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
   case "recheck":checkAdmin();break;
   case "account":modal={t:"account"};render();break;
   case "logout":sb.auth.signOut().then(function(){modal=null;editing=null;auth.tab="in";if(route()&&isAdmin){history.replaceState(null,"",location.pathname)}toast("Вы вышли")});break;

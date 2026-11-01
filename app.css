@@ -430,3 +430,8 @@ h4 .req-n{vertical-align:2px}
 .merge-option span{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin-top:6px;max-height:180px;overflow:auto}
 .merge-option.selected{border-color:var(--accent);background:var(--accent-soft)}
 @media(max-width:560px){.merge-options{grid-template-columns:1fr}.merge-banner{max-height:60vh}}
+
+/* Unread release notice */
+.version-link.has-update{background:#F5B83D;color:#141B26;font-weight:600;box-shadow:0 0 0 1px rgba(20,27,38,.12)}
+.version-link.has-update:hover{background:#FFD47A;color:#141B26}
+.version-new{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:99px;background:#141B26;color:#FFF;font-size:10px;line-height:1.6;vertical-align:1px}

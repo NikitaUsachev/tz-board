@@ -23,8 +23,8 @@ async function boot(admin,deleted=false){
  return {c,app,click,hash,store,listeners,rows};
 }
 (async()=>{
- const a=await boot(true);assert.match(a.app.innerHTML,/Версия 28.2/);assert.match(a.app.innerHTML,/Корзина/);
- a.click('new',{st:'draft'});a.hash();
+ const a=await boot(true);assert.match(a.app.innerHTML,/Версия 28.3/);assert.match(a.app.innerHTML,/Корзина/);
+ assert.match(a.app.innerHTML,/version-link has-update/);a.click('releases');assert.ok(!a.app.innerHTML.includes('version-link has-update'));a.click('close');a.click('new',{st:'draft'});a.hash();
  for(const f of a.listeners.input)f({target:{dataset:{f:'title'},value:'My draft'}});
  a.c.location.hash='';a.hash();assert.match(a.app.innerHTML,/Есть несохранённые правки/);
  a.click('leave-draft');a.hash();assert.match(a.app.innerHTML,/Несохранённые изменения \(1\)/);
