@@ -22,6 +22,20 @@ var app=document.getElementById("app");
 
 var RELEASES=[
   {
+    "version": "28.2",
+    "date": "1 ноября 2026",
+    "title": "Понятное название для восстановления правок",
+    "groups": [
+      {
+        "title": "Удобство работы",
+        "items": [
+          "Раздел «Несохранённые изменения» помогает восстановить правки, которые ещё не сохранены в ТЗ.",
+          "Название и подсказки обновлены, чтобы этот раздел не путался с колонкой «Черновик» на доске."
+        ]
+      }
+    ]
+  },
+  {
     "version": "28.1",
     "date": "1 ноября 2026",
     "title": "Понятная история обновлений",
@@ -55,10 +69,10 @@ var RELEASES=[
         ]
       },
       {
-        "title": "Черновики",
+        "title": "Восстановление изменений",
         "items": [
-          "Несохранённые изменения можно восстановить через «Мои черновики». Черновики доступны только в том браузере на этом устройстве, где вы работали.",
-          "При выходе из редактирования приложение предлагает остаться или сохранить черновик и перейти на другую страницу."
+          "Несохранённые изменения можно восстановить через «Несохранённые изменения». Эти изменения доступны только в том браузере на этом устройстве, где вы работали.",
+          "При выходе из редактирования приложение предлагает остаться или оставить изменения для восстановления и перейти на другую страницу."
         ]
       },
       {
@@ -138,7 +152,7 @@ var RELEASES=[
 ];
 var APP_VERSION=RELEASES[0].version;
 function adminFooter(){
- return '<footer class="admin-footer"><button type="button" class="version-link" data-act="drafts">Мои черновики ('+Object.keys(drafts()).length+')</button><button type="button" class="version-link" data-act="trash">Корзина ('+state.events.filter(function(e){return !!e.deletedAt}).length+')</button><button type="button" id="app-version" class="version-link" data-act="releases" aria-haspopup="dialog">Версия '+esc(APP_VERSION)+'<span aria-hidden="true"> · </span><span>Что нового</span></button></footer>';
+ return '<footer class="admin-footer"><button type="button" class="version-link" data-act="drafts">Несохранённые изменения ('+Object.keys(drafts()).length+')</button><button type="button" class="version-link" data-act="trash">Корзина ('+state.events.filter(function(e){return !!e.deletedAt}).length+')</button><button type="button" id="app-version" class="version-link" data-act="releases" aria-haspopup="dialog">Версия '+esc(APP_VERSION)+'<span aria-hidden="true"> · </span><span>Что нового</span></button></footer>';
 }
 function releasesView(){
  return '<div class="modal gut release-overlay" data-act="close-bg"><section class="dlg release-dialog" role="dialog" aria-modal="true" aria-labelledby="release-title"><div class="release-heading"><h2 id="release-title">История обновлений</h2><button type="button" id="release-close" class="btn ghost sm" data-act="close" aria-label="Закрыть историю обновлений">✕</button></div><p class="hint">Изменения, которые помогают готовить ТЗ и контролировать выполнение работ. Сначала показаны последние обновления.</p><div class="release-history">'+RELEASES.map(function(r){return '<article class="release-entry"><div class="release-meta"><span class="release-version">Версия '+esc(r.version)+'</span><span>'+esc(r.date)+'</span>'+(r.version===APP_VERSION?'<span class="release-current">Текущая</span>':'')+'</div><h3>'+esc(r.title)+'</h3>'+r.groups.map(function(g){return '<h4>'+esc(g.title)+'</h4><ul>'+g.items.map(function(t){return '<li>'+esc(t)+'</li>'}).join("")+'</ul>'}).join("")+'</article>'}).join("")+'</div><div class="bar"><span class="sp"></span><button type="button" class="btn primary" data-act="close">Понятно</button></div></section></div>';
@@ -418,7 +432,7 @@ var draftWarning=false;
 function persistDraft(){
  if(!isAdmin||!editing||!dirty)return true;
  var all=drafts();all[editing.id]={event:cleanEvent(editing),isNew:!!editing._new,uploaded:editing._uploaded||[],base:editingBase,version:editingVersion,at:Date.now()};
- try{localStorage.setItem(draftStorageKey(),JSON.stringify(all));return true}catch(e){if(!draftWarning){draftWarning=true;toast("Не удалось сохранить черновик на устройстве. Не закрывайте редактор — сохраните ТЗ.")}return false}
+ try{localStorage.setItem(draftStorageKey(),JSON.stringify(all));return true}catch(e){if(!draftWarning){draftWarning=true;toast("Не удалось сохранить изменения для восстановления. Не закрывайте редактор — сохраните ТЗ.")}return false}
 }
 function dropDraft(id){var all=drafts();delete all[id];ls.set(draftStorageKey(),all)}
 function recoverDraft(id){
@@ -426,7 +440,7 @@ function recoverDraft(id){
  if(editing&&dirty&&editing.id!==id&&!persistDraft())return;
  editing=clone(d.event);editing._new=!!d.isNew;editing._uploaded=d.uploaded||[];editingBase=clone(d.base||d.event);editingVersion=d.version;
  editingOrig=allPaths(editingBase);dirty=true;conflict=null;modal=null;exitArmed=false;ensureBlocks(editing);
- history.replaceState(null,"",location.pathname+location.search+"#ev-"+id);render();toast("Черновик восстановлен. Проверьте и сохраните ТЗ.");
+ history.replaceState(null,"",location.pathname+location.search+"#ev-"+id);render();toast("Изменения восстановлены. Проверьте и сохраните ТЗ.");
 }
 function bookingConflicts(ev,events){if(!ev.date||!(ev.halls||[]).length||ev.deletedAt)return [];return events.filter(function(other){return other.id!==ev.id&&!other.deletedAt&&other.date===ev.date&&(other.halls||[]).some(function(h){return ev.halls.indexOf(h)>=0})})}
 async function verifyBooking(ev){
@@ -505,7 +519,7 @@ function topBar(){
 }
 function conflictBanner(){
  if(!conflict)return "";
- if(conflict.deleted)return '<div class="banner"><div class="banner-in gut"><p>Это ТЗ удалено другим администратором. Ваши правки остались в редакторе и черновике.</p><button class="btn primary sm" data-act="save-as-new">Продолжить как новое ТЗ</button></div></div>';
+ if(conflict.deleted)return '<div class="banner"><div class="banner-in gut"><p>Это ТЗ удалено другим администратором. Ваши правки остались в редакторе и доступны для восстановления.</p><button class="btn primary sm" data-act="save-as-new">Продолжить как новое ТЗ</button></div></div>';
  var c=conflict;
  return '<section class="banner merge-banner"><div class="banner-in gut"><p><b>Вы с коллегой изменили ТЗ.</b> Независимые правки уже объединены. Для спорных данных выберите, что оставить.</p><div class="merge-fields">'+c.issues.map(function(x,i){return '<fieldset class="merge-field"><legend>'+esc(conflictLabel(x.path))+'</legend><div class="merge-options">'+["mine","theirs"].map(function(side){return '<button type="button" class="merge-option'+(c.choices[i]===side?' selected':'')+'" data-act="merge-choice" data-i="'+i+'" data-side="'+side+'" aria-pressed="'+(c.choices[i]===side)+'"><b>'+(side==="mine"?'Ваш вариант':'Вариант коллеги')+'</b><span>'+esc(readableValue(x[side]))+'</span></button>'}).join("")+'</div></fieldset>'}).join("")+'</div><button class="btn primary sm" data-act="merge-save">Сохранить выбранное</button><button class="btn sm" data-act="close-conflict">Продолжить редактировать</button></div></section>';
 }
@@ -760,7 +774,7 @@ function catEdit(ev,hid,c){
 }
 function editBar(){
  return '<div class="editbar gut"><div class="editbar-in"><span class="msg">'+(dirty?"Есть несохранённые изменения":"Режим редактирования")+'</span>'+
-  (exitArmed?'<button class="btn danger" data-act="discard">Сохранить черновик и выйти</button>':'<button class="btn" data-act="cancel">Отмена</button>')+
+  (exitArmed?'<button class="btn danger" data-act="discard">Оставить изменения и выйти</button>':'<button class="btn" data-act="cancel">Отмена</button>')+
   '<button class="btn primary" data-act="save">Сохранить</button></div></div>';
 }
 function datalists(){return CATS.map(function(c){return '<datalist id="dl-'+c.id+'">'+SUGGEST[c.id].map(function(s){return '<option value="'+esc(s)+'">'}).join("")+'</datalist><datalist id="dr-'+c.id+'">'+ROLES[c.id].map(function(s){return '<option value="'+esc(s)+'">'}).join("")+'</datalist>'}).join("")+'<datalist id="dl-hallroles">'+HALL_ROLES.map(function(s){return '<option value="'+esc(s)+'">'}).join("")+'</datalist>'}
@@ -770,9 +784,9 @@ function modalView(){
  if(!modal)return "";
  if(modal.t==="releases")return isAdmin?releasesView():"";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
- if(modal.t==="leave")return wrap('<h2>Есть несохранённые правки</h2><p>Можно остаться в редакторе или сохранить черновик в этом браузере и перейти дальше.</p><div class="bar"><button class="btn" data-act="stay">Остаться</button><button class="btn primary" data-act="leave-draft">Сохранить черновик и перейти</button></div>',"Несохранённые правки");
- if(modal.t==="recover")return isAdmin?wrap('<h2>Найден ваш черновик</h2><p>Для этого ТЗ в браузере остались несохранённые правки.</p><div class="bar"><button class="btn primary" data-act="recover-draft" data-id="'+esc(modal.id)+'">Восстановить черновик</button><button class="btn" data-act="open-saved" data-id="'+esc(modal.id)+'">Удалить черновик и открыть сохранённое</button></div>',"Ваш черновик"):"";
- if(modal.t==="drafts")return isAdmin?wrap('<h2>Мои черновики</h2><p class="hint">Хранятся только в этом браузере под вашей почтой. Коллеги их не видят. Очистка данных браузера удаляет черновики.</p>'+Object.keys(drafts()).map(function(id){var x=drafts()[id];return '<div class="req"><div class="req-i"><b>'+esc(x.event.title||"Без названия")+'</b><span class="hint">'+esc(new Date(x.at).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="recover-draft" data-id="'+esc(id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Мои черновики"):"";
+ if(modal.t==="leave")return wrap('<h2>Есть несохранённые правки</h2><p>Можно остаться в редакторе или оставить изменения для восстановления и перейти дальше.</p><div class="bar"><button class="btn" data-act="stay">Остаться</button><button class="btn primary" data-act="leave-draft">Оставить изменения и перейти</button></div>',"Несохранённые правки");
+ if(modal.t==="recover")return isAdmin?wrap('<h2>Найдены несохранённые изменения</h2><p>Для этого ТЗ в браузере остались несохранённые правки.</p><div class="bar"><button class="btn primary" data-act="recover-draft" data-id="'+esc(modal.id)+'">Восстановить изменения</button><button class="btn" data-act="open-saved" data-id="'+esc(modal.id)+'">Не применять изменения</button></div>',"Восстановление изменений"):"";
+ if(modal.t==="drafts")return isAdmin?wrap('<h2>Несохранённые изменения</h2><p class="hint">Здесь находятся правки, которые вы ещё не сохранили в ТЗ. Они доступны только вам в этом браузере. Очистка данных браузера удалит эти правки.</p>'+Object.keys(drafts()).map(function(id){var x=drafts()[id];return '<div class="req"><div class="req-i"><b>'+esc(x.event.title||"Без названия")+'</b><span class="hint">'+esc(new Date(x.at).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="recover-draft" data-id="'+esc(id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Несохранённые изменения"):"";
  if(modal.t==="trash")return isAdmin?wrap('<h2>Корзина</h2><p class="hint">ТЗ можно вернуть на доску вместе с содержимым и вложениями.</p>'+state.events.filter(function(e){return !!e.deletedAt}).sort(function(a,b){return b.deletedAt.localeCompare(a.deletedAt)}).map(function(e){return '<div class="req"><div class="req-i"><b>'+esc(e.title||"Без названия")+'</b><span class="hint">'+esc(fmtDate(e.date))+' · удалено '+esc(new Date(e.deletedAt).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="restore" data-id="'+esc(e.id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Корзина"):"";
  if(modal.t==="booking")return isAdmin?wrap('<h2>Зал уже указан в другом мероприятии</h2><p>На '+esc(fmtDate(modal.event.date))+' выбранные залы есть в следующих ТЗ:</p><ul>'+modal.matches.map(function(e){return '<li><b>'+esc(e.title||"Без названия")+'</b> — '+esc((e.halls||[]).filter(function(h){return modal.event.halls.indexOf(h)>=0}).map(function(h){return (hallById(h)||{name:h}).name}).join(", "))+'</li>'}).join("")+'</ul><p class="hint">Проверьте дату или выбор залов. Ваши правки сохранены в редакторе.</p><button class="btn primary" data-act="close">Вернуться</button>',"Проверка занятости залов"):"";
  if(modal.t==="me")return wrap('<h2>Как вас зовут?</h2><p class="hint">Имя будет видно рядом с вашими отметками «сделано», чтобы все понимали, кто что выполнил.</p><form id="me-form" class="halls-row"><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(storedMe())+'"><div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div></form>',"Ваше имя");

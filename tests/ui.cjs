@@ -23,14 +23,14 @@ async function boot(admin,deleted=false){
  return {c,app,click,hash,store,listeners,rows};
 }
 (async()=>{
- const a=await boot(true);assert.match(a.app.innerHTML,/Версия 28/);assert.match(a.app.innerHTML,/Корзина/);
+ const a=await boot(true);assert.match(a.app.innerHTML,/Версия 28.2/);assert.match(a.app.innerHTML,/Корзина/);
  a.click('new',{st:'draft'});a.hash();
  for(const f of a.listeners.input)f({target:{dataset:{f:'title'},value:'My draft'}});
  a.c.location.hash='';a.hash();assert.match(a.app.innerHTML,/Есть несохранённые правки/);
- a.click('leave-draft');a.hash();assert.match(a.app.innerHTML,/Мои черновики \(1\)/);
+ a.click('leave-draft');a.hash();assert.match(a.app.innerHTML,/Несохранённые изменения \(1\)/);
  const saved=JSON.parse(a.store.get('tz-drafts-admin@example.com'));const id=Object.keys(saved)[0];assert.equal(saved[id].event.title,'My draft');
  a.click('recover-draft',{id});assert.match(a.app.innerHTML,/My draft/);a.click('save');await tick();await tick();assert.ok(a.rows.some(r=>r.data.title==='My draft'));
- const t=await boot(false);assert.ok(!t.app.innerHTML.includes('Мои черновики'));assert.ok(!t.app.innerHTML.includes('Корзина'));assert.ok(!t.app.innerHTML.includes('Зарегистрироваться'));assert.match(t.app.innerHTML,/Known event/);
+ const t=await boot(false);assert.ok(!t.app.innerHTML.includes('Несохранённые изменения'));assert.ok(!t.app.innerHTML.includes('Корзина'));assert.ok(!t.app.innerHTML.includes('Зарегистрироваться'));assert.match(t.app.innerHTML,/Known event/);
  for(const f of t.listeners.change)f({target:{dataset:{done:'E|item'},checked:true}});assert.match(t.app.innerHTML,/Как вас зовут/);
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);
  console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, first-check name prompt, hidden trash events');
