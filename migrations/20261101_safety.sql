@@ -1,6 +1,6 @@
 -- Run in Supabase SQL Editor as the project owner, after inspecting the current schema.
 -- Transactional: an error rolls back all changes in this script.
--- Does not change SMTP, accounts, existing technician-check RPCs or Storage access.
+-- Preserves SMTP, accounts and Storage configuration; hardens check RPCs without changing their signatures.
 begin;
 
 -- Keep a server-side copy of the previous event before updates and physical deletion.
@@ -52,13 +52,70 @@ language sql stable security definer set search_path=public,pg_temp as $$
 $$;
 revoke all on function public.get_event_v2(text) from public;
 grant execute on function public.get_event_v2(text) to anon,authenticated;
--- The website falls back only when the new RPC is absent. Disable the old public RPC
--- after v28 has been deployed so deleted events cannot be fetched via the old method.
-do $$ begin
- if to_regprocedure('public.get_event(text)') is not null then
-  execute 'revoke all on function public.get_event(text) from public,anon,authenticated';
- end if;
+-- Preserve old open technician pages while closing access to trashed events.
+create or replace function public.get_event(p_id text)
+returns table(id text,data jsonb,version integer,updated_at timestamptz)
+language sql stable security definer set search_path=public,pg_temp as $$
+ select e.id,e.data,e.version,e.updated_at from public.events e
+ where e.id=p_id and nullif(e.data->>'deletedAt','') is null;
+$$;
+revoke all on function public.get_event(text) from public;
+grant execute on function public.get_event(text) to anon,authenticated;
+
+-- A task is available only while its hall and its visible item/spec are in this TЗ.
+create or replace function public.event_has_task_v28(d jsonb,p_item text)
+returns boolean language plpgsql immutable set search_path=public,pg_temp as $$
+declare h record; b record; sp jsonb; suffix text;
+begin
+ if d is null or p_item is null or length(p_item)=0 or length(p_item)>60 then return false; end if;
+ if jsonb_typeof(d->'halls') is distinct from 'array' or jsonb_typeof(d->'blocks') is distinct from 'object' then return false; end if;
+ for h in select key,value from jsonb_each(d->'blocks') loop
+  if not (d->'halls' ? h.key) or jsonb_typeof(h.value)<>'object' then continue; end if;
+  for b in select key,value from jsonb_each(h.value) loop
+   if jsonb_path_exists(b.value,'$.items[*] ? (@.id == $i)',jsonb_build_object('i',p_item))
+      and exists(select 1 from jsonb_array_elements(case when jsonb_typeof(b.value->'items')='array' then b.value->'items' else '[]'::jsonb end) it
+                 where it->>'id'=p_item and nullif(btrim(it->>'name'),'') is not null) then return true; end if;
+   sp:=b.value->'spec';suffix:=split_part(p_item,':',2);
+   if b.key='stage' and sp->>'id'=split_part(p_item,':',1)
+      and p_item=(sp->>'id')||':'||suffix then
+    if suffix='size' and coalesce(nullif(btrim(sp->>'w'),''),nullif(btrim(sp->>'d'),''),nullif(btrim(sp->>'h'),'')) is not null then return true; end if;
+    if suffix='cover' and coalesce(nullif(btrim(sp->>'cover'),''),nullif(btrim(sp->>'coverNote'),'')) is not null then return true; end if;
+    if suffix='raus' and (sp->>'raus'='yes' or nullif(btrim(sp->>'rausNote'),'') is not null) then return true; end if;
+    if suffix='steps' and coalesce(nullif(btrim(sp->>'stepsFront'),''),nullif(btrim(sp->>'stepsSide'),'')) is not null then return true; end if;
+   end if;
+  end loop;
+ end loop;
+ return false;
 end $$;
+revoke all on function public.event_has_task_v28(jsonb,text) from public,anon,authenticated;
+
+create or replace function public.get_checks(p_id text)
+returns table(item_id text,by_name text,at timestamptz)
+language sql stable security definer set search_path=public,pg_temp as $$
+ select c.item_id,c.by_name,c.at from public.checks c
+ join public.events e on e.id=c.event_id
+ where c.event_id=p_id and c.done and nullif(e.data->>'deletedAt','') is null
+ and public.event_has_task_v28(e.data,c.item_id);
+$$;
+revoke all on function public.get_checks(text) from public;
+grant execute on function public.get_checks(text) to anon,authenticated;
+
+create or replace function public.set_check(p_event text,p_item text,p_done boolean,p_by text)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare d jsonb; nm text:=left(nullif(btrim(regexp_replace(coalesce(p_by,''),'[[:space:]]+',' ','g')),''),60);
+begin
+ if p_done is null then raise exception 'Не указано состояние отметки'; end if;
+ if p_done and nm is null then raise exception 'Укажите имя перед первой отметкой'; end if;
+ -- Share lock prevents the task being removed while this check is being recorded.
+ select data into d from public.events where id=p_event for share;
+ if d is null or nullif(d->>'deletedAt','') is not null then raise exception 'ТЗ не найдено'; end if;
+ if not public.event_has_task_v28(d,p_item) then raise exception 'Пункт изменён или больше не входит в ТЗ. Обновите страницу.'; end if;
+ insert into public.checks(event_id,item_id,done,by_name,at)
+ values(p_event,p_item,p_done,nm,now())
+ on conflict(event_id,item_id) do update set done=excluded.done,by_name=excluded.by_name,at=now();
+end $$;
+revoke all on function public.set_check(text,text,boolean,text) from public;
+grant execute on function public.set_check(text,text,boolean,text) to anon,authenticated;
 
 -- Serialize bookings by date. This does not restrict using a hall on different dates.
 create or replace function public.guard_event_booking_v28() returns trigger
