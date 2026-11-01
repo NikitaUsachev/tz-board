@@ -42,7 +42,7 @@ drop policy if exists "settings write" on public.settings;
 drop policy if exists "admins read" on public.admins;
 drop policy if exists "admins add" on public.admins;
 drop policy if exists "admins remove" on public.admins;
-create policy "events read" on public.events for select to anon, authenticated using (true);
+create policy "events read" on public.events for select to authenticated using (public.is_admin());
 create policy "events write" on public.events for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "settings read" on public.settings for select to anon, authenticated using (true);
 create policy "settings write" on public.settings for all to authenticated using (public.is_admin()) with check (public.is_admin());
@@ -57,3 +57,15 @@ end $$;
 
 -- Первый администратор (замените адрес):
 -- insert into public.admins (email) values ('you@example.com');
+
+-- Публичное чтение только одного ТЗ по точному идентификатору ссылки.
+-- Идентификатор ссылки является ключом доступа: не публикуйте ссылки на закрытые ТЗ.
+create or replace function public.get_event(p_id text)
+returns table(id text, data jsonb, version integer, updated_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select e.id, e.data, e.version, e.updated_at
+  from public.events e where e.id = p_id;
+$$;
+revoke all on function public.get_event(text) from public;
+grant execute on function public.get_event(text) to anon, authenticated;
+
