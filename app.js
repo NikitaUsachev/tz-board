@@ -16,12 +16,13 @@ var SUGGEST={
 var sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:"implicit"}});
 var state={halls:[],events:[]}, versions={}, loaded=false, loadError="";
 var session=null, isAdmin=false, admins=[], authReady=false, techMsg="", auth={tab:"in",email:"",msg:"",err:"",busy:false}, rtChannel=null;
+var editingBase=null, settingsData={}, settingsStamp=null, allRequest=0, techRequest=0, authRequest=0;
 var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pickerOpen=false, modal=null, exitArmed=false, delArmed=false, conflict=null, busy=false;
 var app=document.getElementById("app");
 
 /* ---------- helpers ---------- */
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function uid(){return Math.random().toString(36).slice(2,10)}
+function uid(){return crypto.randomUUID()}
 function clone(o){return JSON.parse(JSON.stringify(o))}
 var ls={get:function(k){try{var v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}},set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 /* ---------- theme ---------- */
@@ -67,7 +68,7 @@ var DOC_ACCEPT=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.rtf,.txt,.png,.
 function fileLists(ev){var out=[];if(!ev)return out;Object.keys(ev.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=ev.blocks[h][c.id];if(b&&b.files)out.push(b.files)})});DOCS.forEach(function(d){if(ev.docs&&ev.docs[d.id])out.push(ev.docs[d.id])});return out}
 function allPaths(ev){var out=[];fileLists(ev).forEach(function(l){l.forEach(function(f){if(f.path)out.push(f.path)})});return out}
 function pathInUse(path,exceptId){return state.events.some(function(e){return e.id!==exceptId&&allPaths(e).indexOf(path)>=0})}
-function removeFiles(paths,exceptId){paths=(paths||[]).filter(function(p){return !pathInUse(p,exceptId)});if(paths.length)sb.storage.from(BUCKET).remove(paths).then(function(){},function(){})}
+function removeFiles(paths,exceptId,temporary){if(!temporary)return;paths=(paths||[]).filter(function(p){return !pathInUse(p,exceptId)});if(paths.length)sb.storage.from(BUCKET).remove(paths).then(function(){},function(){})}
 function uploading(ev){return fileLists(ev).some(function(l){return l.some(function(f){return f.uploading})})}
 /* key: "b|hall|cat" for block files, "d|tech" for event documents */
 function listFor(key){
@@ -76,17 +77,17 @@ function listFor(key){
  editing.docs=editing.docs||{};editing.docs[p[1]]=editing.docs[p[1]]||[];return editing.docs[p[1]];
 }
 function uploadFiles(key,list){
- var arr=listFor(key);if(!arr)return;
+ var owner=editing,arr=listFor(key);if(!owner||!arr)return;
  Array.prototype.forEach.call(list,function(file){
   if(file.size>MAX_FILE){toast("«"+file.name+"» больше 50 МБ. Сожмите файл или загрузите по частям.");return}
   var ext=fileExt(file.name),entry={id:uid(),name:file.name,size:file.size,uploading:true};
-  var path=editing.id+"/"+uid()+uid()+(ext?"."+ext:"");
+  var path=owner.id+"/"+uid()+uid()+(ext?"."+ext:"");
   arr.push(entry);dirty=true;render();
   var drop=function(msg){var i=arr.indexOf(entry);if(i>=0)arr.splice(i,1);toast(msg);render()};
   sb.storage.from(BUCKET).upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false,cacheControl:"31536000"}).then(function(r){
    if(r.error){drop("Не удалось загрузить «"+file.name+"»: "+r.error.message);return}
    delete entry.uploading;entry.path=path;entry.uploadedAt=Date.now();
-   if(editing){editing._uploaded=editing._uploaded||[];editing._uploaded.push(path)}else removeFiles([path]);
+   if(editing===owner){owner._uploaded=owner._uploaded||[];owner._uploaded.push(path)}else removeFiles([path],owner.id,true);
    render();
   },function(){drop("Не удалось загрузить «"+file.name+"»")});
  });
@@ -137,23 +138,30 @@ function myEmail(){return session&&session.user&&session.user.email||""}
 
 /* ---------- data ---------- */
 function loadAll(){
+ var request=++allRequest,who=myEmail();
  return Promise.all([
-  sb.from("settings").select("data").eq("id",1).maybeSingle(),
+  sb.from("settings").select("data,updated_at").eq("id",1).maybeSingle(),
   sb.from("events").select("id,data,version,updated_at,updated_by")
  ]).then(function(r){
-  if(r[0].error)throw r[0].error; if(r[1].error)throw r[1].error;
+  if(request!==allRequest||!isAdmin||who!==myEmail())return;
+  if(r[0].error)throw r[0].error;
+  if(r[1].error)throw r[1].error;
+  settingsData=clone((r[0].data&&r[0].data.data)||{});settingsStamp=r[0].data?r[0].data.updated_at:null;
   state.halls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
   versions={};
   state.events=(r[1].data||[]).map(function(row){var e=row.data||{};e.id=row.id;e.updatedAt=Date.parse(row.updated_at)||0;e.updatedBy=row.updated_by||"";versions[row.id]=row.version;return e});
   loaded=true;loadError="";render();
- }).catch(function(e){loadError=(e&&e.message)||"Нет связи с базой";loaded=true;render()});
+ }).catch(function(e){if(request!==allRequest||!isAdmin||who!==myEmail())return;loadError=(e&&e.message)||"Нет связи с базой";loaded=true;render()});
 }
 function loadTech(id){
  if(!id){render();return Promise.resolve()}
+ var request=++techRequest;
  return Promise.all([
   sb.from("settings").select("data").eq("id",1).maybeSingle(),
   sb.rpc("get_event",{p_id:id})
  ]).then(function(r){
+  if(request!==techRequest||route()!==id||isAdmin)return;
+  if(r[0].error)throw r[0].error;
   if(r[1].error)throw r[1].error;
   state.halls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
   var row=(r[1].data||[])[0],prevV=versions[id];versions={};
@@ -162,12 +170,12 @@ function loadTech(id){
    else if(prevV!=null&&prevV!==row.version){toast("ТЗ обновлено администратором");flagTitle(true)}}
   if(loaded&&!loadError&&row&&prevV===row.version)return;
   loaded=true;loadError="";render();
- }).catch(function(e){loadError=(e&&e.message)||"Нет связи с базой";loaded=true;render()});
+ }).catch(function(e){if(request!==techRequest||route()!==id||isAdmin)return;loadError=(e&&e.message)||"Нет связи с базой";loaded=true;render()});
 }
 /* ---------- shared "done" checks ---------- */
-var checks={},checksFor=null,checksKey="",pendingCheck=null;
-function loadChecks(id){if(!id)return Promise.resolve();
- return sb.rpc("get_checks",{p_id:id}).then(function(r){if(r.error||route()!==id)return;var m={};(r.data||[]).forEach(function(x){m[x.item_id]={by:x.by_name||"",at:x.at}});
+var checks={},checksFor=null,checksKey="",pendingCheck=null,checkRequest=0,checkPending={};
+function loadChecks(id){if(!id)return Promise.resolve();var request=++checkRequest;
+ return sb.rpc("get_checks",{p_id:id}).then(function(r){if(r.error||route()!==id||request!==checkRequest||Object.keys(checkPending).length)return;var m={};(r.data||[]).forEach(function(x){m[x.item_id]={by:x.by_name||"",at:x.at}});
   var k=JSON.stringify(m);checksFor=id;if(k!==checksKey){checksKey=k;checks=m;if(!editing&&!modal)render()}})}
 var meMem="";
 function getCookie(n){var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)"));try{return m?decodeURIComponent(m[1]):""}catch(e){return ""}}
@@ -177,10 +185,16 @@ function myName(){return isAdmin?(storedMe()||myEmail().split("@")[0]):storedMe(
 function shortName(n){var p=String(n||"").trim().split(/\s+/);var f=p[0]?p[0].charAt(0).toUpperCase()+p[0].slice(1):"";return p.length>1?f+" "+p[1].charAt(0).toUpperCase()+".":f}
 function fmtWhen(at){var d=new Date(at);if(isNaN(d))return "";var t=d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});var today=new Date();return d.toDateString()===today.toDateString()?t:d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" "+t}
 function setCheck(evid,item,done){
- var prev=checks[item];if(done)checks[item]={by:myName(),at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";render();
- sb.rpc("set_check",{p_event:evid,p_item:item,p_done:done,p_by:myName()}).then(function(r){
+ var key=evid+"|"+item;if(checkPending[key]){render();return}
+ var name=myName();if(done&&!name)return;
+ checkPending[key]=true;++checkRequest;
+ var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";render();
+ sb.rpc("set_check",{p_event:evid,p_item:item,p_done:done,p_by:name}).then(function(r){
+  delete checkPending[key];
+  if(route()!==evid)return;
   if(r.error){if(prev)checks[item]=prev;else delete checks[item];render();toast("Не удалось сохранить отметку: "+r.error.message);return}
-  if(checks[item])delete checks[item].pending;loadChecks(evid)});
+  if(checks[item])delete checks[item].pending;loadChecks(evid);
+ },function(){delete checkPending[key];if(route()!==evid)return;if(prev)checks[item]=prev;else delete checks[item];render();toast("Не удалось сохранить отметку: ошибка сети")});
 }
 setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
 var reloadT;
@@ -192,8 +206,11 @@ function subscribe(){
 }
 function unsubscribe(){if(rtChannel){try{sb.removeChannel(rtChannel)}catch(_){}rtChannel=null}}
 function checkAdmin(){
- var p=session?sb.rpc("is_admin").then(function(r){isAdmin=!!r.data}):Promise.resolve(isAdmin=false);
+ var request=++authRequest,who=myEmail();
+ var current=function(){return request===authRequest&&who===myEmail()};
+ var p=session?sb.rpc("is_admin").then(function(r){if(current())isAdmin=!r.error&&r.data===true}):Promise.resolve(isAdmin=false);
  return p.then(function(){
+  if(!current())return;
   authReady=true;loaded=false;
   if(isAdmin){subscribe();return Promise.all([loadAll(),loadAdmins(),loadRequests()]).then(render)}
   if(session)sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()});
@@ -240,9 +257,14 @@ function saveEvent(ev,isNew,force){
  },function(e){return fail(e)});
 }
 function setStatus(id,status){
- var ev=evById(id);if(!ev||!isAdmin)return;
- var e=cleanEvent(ev);e.status=status;ev.status=status;render();
- sb.from("events").update({data:e}).eq("id",id).select("id").then(function(r){if(r.error||!r.data||!r.data.length){toast("Не удалось изменить статус");}loadAll()});
+ var ev=evById(id);if(!ev||!isAdmin||busy)return;
+ var version=versions[id];if(version==null){toast("Обновите доску перед сменой статуса");return}
+ var e=cleanEvent(ev);e.status=status;busy=true;
+ sb.from("events").update({data:e}).eq("id",id).eq("version",version).select("id").then(function(r){busy=false;
+  if(r.error)toast("Не удалось изменить статус: "+r.error.message);
+  else if(!r.data||!r.data.length)toast("ТЗ изменилось или доступ отозван. Доска обновлена — повторите смену статуса.");
+  return loadAll();
+ },function(){busy=false;toast("Не удалось изменить статус: ошибка сети");loadAll()});
 }
 function deleteEvent(id){
  busy=true;showSaving(true);
@@ -251,10 +273,19 @@ function deleteEvent(id){
   var gone=evById(id);if(gone)removeFiles(allPaths(gone),id);toast("ТЗ удалено");go(null);loadAll()});
 }
 function saveHalls(halls){
- busy=true;showSaving(true);
- return sb.from("settings").upsert({id:1,data:{halls:halls}}).select("id").then(function(r){busy=false;showSaving(false);
-  if(r.error||!r.data||!r.data.length)return fail(r.error||{message:"нет прав"});
-  state.halls=halls;toast("Настройки сохранены");render();return true});
+ if(busy||!isAdmin)return Promise.resolve(false);
+ var owner=modal,base=owner&&owner.settingsBase||settingsData;
+ var data=clone(base);data.halls=halls;busy=true;showSaving(true);
+ var q=sb.from("settings");
+ q=owner&&owner.settingsExists?q.update({data:data}).eq("id",1).eq("data",JSON.stringify(base)):q.insert({id:1,data:data});
+ return q.select("id,data,updated_at").then(function(r){
+  busy=false;showSaving(false);
+  if(r.error)return fail(r.error);
+  if(!r.data||!r.data.length){toast("Настройки изменены другим администратором. Закройте окно и откройте заново; ваши поля пока сохранены.");return loadAll().then(function(){return false})}
+  settingsData=clone(data);settingsStamp=r.data[0].updated_at;state.halls=halls;
+  if(modal===owner){owner.settingsBase=clone(data);owner.settingsExists=true}
+  toast("Настройки сохранены");render();return true;
+ },function(e){return fail(e)});
 }
 
 /* ---------- UI bits ---------- */
@@ -571,7 +602,7 @@ function modalView(){
 
 /* ---------- auth screen ---------- */
 var AUTH_ERR={"Invalid login credentials":"Неверная почта или пароль.","Email not confirmed":"Почта ещё не подтверждена. Откройте письмо от Supabase и нажмите ссылку подтверждения.","User already registered":"Этот адрес уже зарегистрирован. Войдите или восстановите пароль.","Password should be at least 6 characters.":"Пароль слишком короткий."};
-function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m])return AUTH_ERR[m];if(/email rate limit/i.test(m))return "Лимит писем исчерпан: бесплатная почта сервиса отправляет не больше 2 писем в час на весь сайт. Попробуйте через час или попросите администратора.";if(/rate|limit|seconds/i.test(m))return "Слишком много попыток. Подождите минуту и попробуйте снова.";return m}
+function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m])return AUTH_ERR[m];if(/email rate limit/i.test(m))return "Лимит писем исчерпан: достигнуто ограничение отправки писем. Попробуйте позже; если ошибка повторится, администратору нужно проверить SMTP и лимиты Auth.";if(/rate|limit|seconds/i.test(m))return "Слишком много попыток. Подождите минуту и попробуйте снова.";return m}
 function authView(){
  var h='<div class="auth gut"><div class="auth-top">'+themeBtn()+'</div><div class="auth-card"><div class="auth-brand"><span class="eyebrow">Техническое обеспечение мероприятий</span><h1>ТЗ на мероприятия</h1></div>';
  if(session&&!isAdmin){
@@ -615,17 +646,30 @@ function render(){
 
 /* ---------- events ---------- */
 function newEvent(status){return {id:uid(),title:"",date:"",mount:"",rehearsal:"",start:"",end:"",status:status||"draft",halls:[],notes:"",blocks:{},_new:true}}
-function startEdit(ev){editingOrig=allPaths(ev);editing=clone(ev);editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing)}
-function leaveEdit(){if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id);var wasNew=editing&&editing._new;editing=null;dirty=false;exitArmed=false;pickerOpen=false;conflict=null;if(wasNew)go(null);else render()}
+function startEdit(ev){editingBase=clone(ev);editingOrig=allPaths(ev);editing=clone(ev);editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing)}
+function leaveEdit(){if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id,true);var wasNew=editing&&editing._new;editing=null;dirty=false;exitArmed=false;pickerOpen=false;conflict=null;if(wasNew)go(null);else render()}
 function moveItem(h,c,from,to){
  var arr=editing&&editing.blocks[h]&&editing.blocks[h][c]&&editing.blocks[h][c].items;if(!arr)return;
  if(to<0||to>=arr.length||from===to)return;
  var it=arr.splice(from,1)[0];arr.splice(to,0,it);dirty=true;exitArmed=false;render();
 }
 function moveHall(from,to){if(!modal||!modal.halls||to<0||to>=modal.halls.length||from===to)return;var h=modal.halls.splice(from,1)[0];modal.halls.splice(to,0,h);modal.hallsDirty=true;render()}
+function renewChangedTasks(ev,base){
+ if(!base||ev._new)return;
+ Object.keys(ev.blocks||{}).forEach(function(h){CATS.forEach(function(c){
+  var b=ev.blocks[h][c.id],old=base.blocks&&base.blocks[h]&&base.blocks[h][c.id];if(!b||!old)return;
+  (b.items||[]).forEach(function(it){var prev=(old.items||[]).filter(function(x){return x.id===it.id})[0];
+   if(prev&&["name","qty","note"].some(function(k){return String(prev[k]||"").trim()!==String(it[k]||"").trim()}))it.id=uid();
+  });
+  if(b.spec&&old.spec&&b.spec.id===old.spec.id){var a=clone(b.spec),o=clone(old.spec);delete a.id;delete o.id;
+   var keys=Object.keys(a).concat(Object.keys(o));if(keys.some(function(k){return String(a[k]||"").trim()!==String(o[k]||"").trim()}))b.spec.id=uid();
+  }
+ })});
+}
 function saveEditing(){
  if(busy)return;
  if(uploading(editing)){toast("Дождитесь окончания загрузки файлов");return}
+ renewChangedTasks(editing,editingBase);
  var ev=clone(editing);var isNew=!!ev._new;
  if(!(ev.title||"").trim())ev.title="Без названия";
  saveEvent(ev,isNew,false);
@@ -640,7 +684,7 @@ app.addEventListener("click",function(e){
  switch(a){
   case "back":
    if(editing&&dirty&&!exitArmed){exitArmed=true;render();return}
-   editing=null;dirty=false;exitArmed=false;delArmed=false;conflict=null;go(null);break;
+   if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id,true);editing=null;dirty=false;exitArmed=false;delArmed=false;conflict=null;go(null);break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
@@ -653,7 +697,7 @@ app.addEventListener("click",function(e){
   case "discard":leaveEdit();break;
   case "save":saveEditing();break;
   case "force":if(conflict)saveEvent(conflict.ev,false,true);break;
-  case "take-theirs":conflict=null;editing=null;dirty=false;loadAll();break;
+  case "take-theirs":if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id,true);conflict=null;editing=null;dirty=false;loadAll();break;
   case "dup":var src=evById(d.id);if(!src)return;var cp=cleanEvent(src);cp.id=uid();cp.title=(cp.title||"")+" (копия)";cp.status="draft";
    Object.keys(cp.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=cp.blocks[h][c.id];if(b)b.items.forEach(function(i){i.id=uid()})})});
    startEdit(cp);editing._new=true;dirty=true;location.hash="ev-"+cp.id;break;
@@ -681,16 +725,16 @@ app.addEventListener("click",function(e){
   case "rm-staff":editing.blocks[d.h][d.c].staff.splice(+d.i,1);dirty=true;render();break;
   case "rm-link":editing.blocks[d.h][d.c].links.splice(+d.i,1);dirty=true;render();break;
   case "rm-file":var farr=listFor(d.key),pf=farr&&farr[+d.i];if(!farr)break;farr.splice(+d.i,1);dirty=true;
-   if(pf&&pf.path&&editing._uploaded&&editing._uploaded.indexOf(pf.path)>=0){editing._uploaded=editing._uploaded.filter(function(p){return p!==pf.path});removeFiles([pf.path],editing.id)}
+   if(pf&&pf.path&&editing._uploaded&&editing._uploaded.indexOf(pf.path)>=0){editing._uploaded=editing._uploaded.filter(function(p){return p!==pf.path});removeFiles([pf.path],editing.id,true)}
    render();break;
   case "rm-item":editing.blocks[d.h][d.c].items.splice(+d.i,1);dirty=true;render();break;
   case "mv-up":case "mv-down":var to=+d.i+(a==="mv-up"?-1:1);moveItem(d.h,d.c,+d.i,to);
    var bt=document.querySelector('[data-act="'+a+'"][data-h="'+d.h+'"][data-c="'+d.c+'"][data-i="'+to+'"]');if(bt&&!bt.disabled)bt.focus();break;
-  case "settings":pickerOpen=false;modal={t:"settings",halls:clone(state.halls)};render();Promise.all([loadAdmins(),loadRequests()]).then(render);break;
+  case "settings":pickerOpen=false;modal={t:"settings",halls:clone(state.halls),settingsBase:clone(settingsData),settingsExists:settingsStamp!==null};render();Promise.all([loadAdmins(),loadRequests()]).then(render);break;
   case "req-accept":decideRequest(d.email,true);break;
   case "req-reject":decideRequest(d.email,false);break;
   case "add-hall":modal.halls.push({id:"h"+uid(),name:"Новый зал"});render();var ins=document.querySelectorAll("[data-hallname]");if(ins.length){ins[ins.length-1].focus();ins[ins.length-1].select()}break;
-  case "rm-hall":modal.halls.splice(+d.i,1);render();break;
+  case "rm-hall":var hid=modal.halls[+d.i].id;if(state.events.some(function(ev){return (ev.halls||[]).indexOf(hid)>=0})){toast("Зал используется в ТЗ. Сначала уберите его из мероприятий.");break}modal.halls.splice(+d.i,1);render();break;
   case "mv-hall":moveHall(+d.i,+d.to);var hb=document.querySelector('[data-act="mv-hall"][data-i="'+d.to+'"][data-to="'+(2*(+d.to)-(+d.i))+'"]');if(hb&&!hb.disabled)hb.focus();break;
   case "save-settings":var halls=modal.halls.filter(function(h){return h.name.trim()}).map(function(h){return {id:h.id,name:h.name.trim()}});
    saveHalls(halls).then(function(ok){if(ok&&modal)modal.halls=clone(state.halls);render()});break;
@@ -786,7 +830,7 @@ app.addEventListener("dragend",function(){hallDrag=null;document.querySelectorAl
 /* drag to reorder items inside one block */
 var itemDrag=null;
 function clearDropMarks(){document.querySelectorAll(".erow.drop-before,.erow.drop-after").forEach(function(x){x.classList.remove("drop-before","drop-after")})}
-app.addEventListener("dragstart",function(e){var g=e.target.closest&&e.target.closest(".grip");if(!g)return;var row=g.closest(".erow");var p=row.dataset.erow.split("|");itemDrag={h:p[0],c:p[1],i:+p[2]};row.classList.add("dragging");
+app.addEventListener("dragstart",function(e){var g=e.target.closest&&e.target.closest(".grip");if(!g)return;var row=g.closest(".erow");if(!row)return;var p=row.dataset.erow.split("|");itemDrag={h:p[0],c:p[1],i:+p[2]};row.classList.add("dragging");
  try{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain","item");e.dataTransfer.setDragImage(row,20,20)}catch(_){}});
 app.addEventListener("dragover",function(e){if(!itemDrag)return;var row=e.target.closest(".erow");if(!row)return;var p=row.dataset.erow.split("|");if(p[0]!==itemDrag.h||p[1]!==itemDrag.c)return;
  e.preventDefault();var r=row.getBoundingClientRect(),after=e.clientY>r.top+r.height/2;clearDropMarks();row.classList.add(after?"drop-after":"drop-before")});
@@ -819,3 +863,4 @@ sb.auth.onAuthStateChange(function(ev,s){
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&!editing&&authReady)scheduleReload()});
 setInterval(function(){if(authReady&&!isAdmin&&route()&&!document.hidden)loadTech(route())},60000);
 })();
+
