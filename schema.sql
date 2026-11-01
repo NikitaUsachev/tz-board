@@ -64,8 +64,9 @@ create or replace function public.get_event(p_id text)
 returns table(id text, data jsonb, version integer, updated_at timestamptz)
 language sql stable security definer set search_path = public as $$
   select e.id, e.data, e.version, e.updated_at
-  from public.events e where e.id = p_id;
+  from public.events e where e.id = p_id and nullif(e.data->>'deletedAt','') is null;
 $$;
 revoke all on function public.get_event(text) from public;
 grant execute on function public.get_event(text) to anon, authenticated;
+
 

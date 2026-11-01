@@ -21,11 +21,16 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+ {version:"28",date:"1 ноября 2026",title:"Правки защищены, удалённые ТЗ можно вернуть",groups:[
+  {title:"Работа с коллегой",items:["Независимые правки в одном ТЗ объединяются при сохранении. Если вы изменили одно и то же поле, приложение покажет оба варианта и предложит выбрать.","Прежняя кнопка, которая могла заменить всё ТЗ вашей версией, убрана."]},
+  {title:"Корзина и черновики",items:["Удалённое ТЗ перемещается в корзину. Администратор может вернуть его на доску вместе с вложениями.","Если коллега изменил ТЗ перед удалением, приложение попросит проверить свежую версию.","Несохранённые правки сохраняются как черновик в этом браузере. На доске появилась кнопка «Мои черновики».","При переходе из редактора приложение предложит остаться или сохранить черновик и перейти дальше."]},
+  {title:"Залы и даты",items:["Перед сохранением приложение проверяет, не указан ли выбранный зал в другом ТЗ на ту же дату. При совпадении покажет мероприятие.","Один и тот же зал по-прежнему можно использовать в мероприятиях на разные даты."]}
+ ]},
  {version:"27",date:"1 ноября 2026",title:"История обновлений под рукой",groups:[
   {title:"Новое",items:["Внизу страницы администратора появился номер версии. Нажмите на него, чтобы узнать, что изменилось.","В этом окне собраны изменения по версиям: новые возможности и исправления простыми словами."]}
  ]},
  {version:"26",date:"1 ноября 2026",title:"Надёжнее при совместной работе",groups:[
-  {title:"Совместная работа",items:["Перемещение карточки в другой статус больше не затирает свежие правки коллеги. Если ТЗ уже изменилось, появится сообщение с просьбой повторить действие.","При одновременном изменении списка залов приложение предупредит о конфликте и сохранит ваши поля в открытом окне."]},
+  {title:"Совместная работа",items:["Перемещение карточки в другой статус больше не затирает свежие правки коллеги. Если ТЗ уже изменилось, появится сообщение с просьбой повторить действие.","Если два администратора одновременно меняют справочник залов в настройках, приложение не даст случайно стереть изменения друг друга."]},
   {title:"Отметки выполнения",items:["Если изменить название, количество или комментарий уже выполненного пункта, его нужно отметить заново.","Перестановка пунктов не сбрасывает отметки. Изменение параметров сцены требует повторного подтверждения.","Повторное нажатие во время сохранения не отправляет вторую отметку. Если сохранение не удалось, приложение сообщит об этом."]},
   {title:"Файлы и удобство",items:["Исправлена загрузка файлов при переходе между разными ТЗ.","Сохранённые файлы больше не удаляются автоматически из хранилища: это защищает вложения в копиях ТЗ. Убрать вложение со страницы по-прежнему можно.","Исправлена ошибка при перетаскивании залов.","Запоздавшая загрузка предыдущего ТЗ больше не мешает открыть следующее.","Нельзя удалить из настроек зал, который используется в загруженных ТЗ."]}
  ]},
@@ -35,7 +40,7 @@ var RELEASES=[
 ];
 var APP_VERSION=RELEASES[0].version;
 function adminFooter(){
- return '<footer class="admin-footer"><button type="button" id="app-version" class="version-link" data-act="releases" aria-haspopup="dialog">Версия '+esc(APP_VERSION)+'<span aria-hidden="true"> · </span><span>Что нового</span></button></footer>';
+ return '<footer class="admin-footer"><button type="button" class="version-link" data-act="drafts">Мои черновики ('+Object.keys(drafts()).length+')</button><button type="button" class="version-link" data-act="trash">Корзина ('+state.events.filter(function(e){return !!e.deletedAt}).length+')</button><button type="button" id="app-version" class="version-link" data-act="releases" aria-haspopup="dialog">Версия '+esc(APP_VERSION)+'<span aria-hidden="true"> · </span><span>Что нового</span></button></footer>';
 }
 function releasesView(){
  return '<div class="modal gut release-overlay" data-act="close-bg"><section class="dlg release-dialog" role="dialog" aria-modal="true" aria-labelledby="release-title"><div class="release-heading"><h2 id="release-title">Что нового</h2><button type="button" id="release-close" class="btn ghost sm" data-act="close" aria-label="Закрыть историю обновлений">✕</button></div><p class="hint">Новые возможности и исправления. Последнее обновление — сверху.</p><div class="release-history">'+RELEASES.map(function(r){return '<article class="release-entry"><div class="release-meta"><span class="release-version">Версия '+esc(r.version)+'</span><span>'+esc(r.date)+'</span>'+(r.version===APP_VERSION?'<span class="release-current">Текущая</span>':'')+'</div><h3>'+esc(r.title)+'</h3>'+r.groups.map(function(g){return '<h4>'+esc(g.title)+'</h4><ul>'+g.items.map(function(t){return '<li>'+esc(t)+'</li>'}).join("")+'</ul>'}).join("")+'</article>'}).join("")+'</div><div class="bar"><span class="sp"></span><button type="button" class="btn primary" data-act="close">Понятно</button></div></section></div>';
@@ -179,13 +184,13 @@ function loadTech(id){
  var request=++techRequest;
  return Promise.all([
   sb.from("settings").select("data").eq("id",1).maybeSingle(),
-  sb.rpc("get_event",{p_id:id})
+  sb.rpc("get_event_v2",{p_id:id}).then(function(r){return r.error&&(r.error.code==="PGRST202"||r.error.code==="42883")?sb.rpc("get_event",{p_id:id}):r})
  ]).then(function(r){
   if(request!==techRequest||route()!==id||isAdmin)return;
   if(r[0].error)throw r[0].error;
   if(r[1].error)throw r[1].error;
   state.halls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
-  var row=(r[1].data||[])[0],prevV=versions[id];versions={};
+  var row=(r[1].data||[])[0],prevV=versions[id];if(row&&row.data&&row.data.deletedAt)row=null;versions={};
   state.events=row?[(function(){var e=row.data||{};e.id=row.id;e.updatedAt=Date.parse(row.updated_at)||0;versions[row.id]=row.version;return e})()]:[];
   if(row){var seen=ls.get("tz-seen-"+row.id);if(!seen||!seen.d)markSeen(state.events[0]);
    else if(prevV!=null&&prevV!==row.version){toast("ТЗ обновлено администратором");flagTitle(true)}}
@@ -259,26 +264,8 @@ function loadAdmins(){return sb.from("admins").select("email").order("email").th
 function cleanEvent(ev){var e=clone(ev);if(e.hallRoles){Object.keys(e.hallRoles).forEach(function(k){var v=String(e.hallRoles[k]||"").trim();if(!v||(e.halls||[]).indexOf(k)<0)delete e.hallRoles[k];else e.hallRoles[k]=v});if(!Object.keys(e.hallRoles).length)delete e.hallRoles}delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});var sk=Object.keys(b.spec).filter(function(k){return k!=="id"});if(!sk.length)delete b.spec;else if(!b.spec.id)b.spec.id=uid()}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
 function fail(e,prefix){busy=false;showSaving(false);toast((prefix||"Не удалось сохранить")+": "+((e&&e.message)||"ошибка сети"));return false}
 
-function saveEvent(ev,isNew,force){
- if(!isAdmin){toast("Сохранение доступно только администраторам");return Promise.resolve(false)}
- var data=cleanEvent(ev);busy=true;showSaving(true);
- var q=(isNew)?sb.from("events").insert({id:ev.id,data:data}).select("id,version")
-  :(force?sb.from("events").update({data:data}).eq("id",ev.id).select("id,version")
-   :sb.from("events").update({data:data}).eq("id",ev.id).eq("version",editingVersion).select("id,version"));
- return q.then(function(r){
-  busy=false;showSaving(false);
-  if(r.error)return fail(r.error);
-  if(!r.data||!r.data.length){
-   if(!isNew&&!force){conflict={ev:ev};render();return false}
-   return fail({message:"нет прав на запись"});
-  }
-  var keep=allPaths(ev);removeFiles(editingOrig.filter(function(p){return keep.indexOf(p)<0}),ev.id);editingOrig=[];
-  editing=null;dirty=false;exitArmed=false;conflict=null;toast("Сохранено");
-  return loadAll().then(function(){if(route()!==ev.id)location.hash="ev-"+ev.id;else render();return true});
- },function(e){return fail(e)});
-}
 function setStatus(id,status){
- var ev=evById(id);if(!ev||!isAdmin||busy)return;
+ var ev=evById(id);if(!ev||ev.deletedAt||!isAdmin||busy)return;
  var version=versions[id];if(version==null){toast("Обновите доску перед сменой статуса");return}
  var e=cleanEvent(ev);e.status=status;busy=true;
  sb.from("events").update({data:e}).eq("id",id).eq("version",version).select("id").then(function(r){busy=false;
@@ -286,12 +273,6 @@ function setStatus(id,status){
   else if(!r.data||!r.data.length)toast("ТЗ изменилось или доступ отозван. Доска обновлена — повторите смену статуса.");
   return loadAll();
  },function(){busy=false;toast("Не удалось изменить статус: ошибка сети");loadAll()});
-}
-function deleteEvent(id){
- busy=true;showSaving(true);
- sb.from("events").delete().eq("id",id).select("id").then(function(r){busy=false;showSaving(false);
-  if(r.error||!r.data||!r.data.length)return fail(r.error||{message:"нет прав на удаление"},"Не удалось удалить");
-  var gone=evById(id);if(gone)removeFiles(allPaths(gone),id);toast("ТЗ удалено");go(null);loadAll()});
 }
 function saveHalls(halls){
  if(busy||!isAdmin)return Promise.resolve(false);
@@ -307,6 +288,100 @@ function saveHalls(halls){
   if(modal===owner){owner.settingsBase=clone(data);owner.settingsExists=true}
   toast("Настройки сохранены");render();return true;
  },function(e){return fail(e)});
+}
+
+/* ---------- safe editing, merge and recovery ---------- */
+function sameValue(a,b){
+ if(a===b)return true;if(a===null||b===null||typeof a!==typeof b||typeof a!=="object")return false;
+ if(Array.isArray(a)||Array.isArray(b))return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every(function(x,i){return sameValue(x,b[i])});
+ var ak=Object.keys(a).sort(),bk=Object.keys(b).sort();return ak.length===bk.length&&ak.every(function(k,i){return k===bk[i]&&sameValue(a[k],b[k])});
+}
+function copyValue(x){return x===undefined?undefined:clone(x)}
+function mergeChanges(base,mine,theirs,path,issues){
+ if(sameValue(mine,base))return copyValue(theirs);
+ if(sameValue(theirs,base)||sameValue(mine,theirs))return copyValue(mine);
+ var obj=function(v){return v&&typeof v==="object"&&!Array.isArray(v)};
+ if(obj(mine)&&obj(theirs)&&(base===undefined||obj(base))){
+  var out={},keys=Object.keys(base||{}).concat(Object.keys(mine),Object.keys(theirs));
+  keys.filter(function(k,i){return keys.indexOf(k)===i&&["__proto__","constructor","prototype"].indexOf(k)<0}).forEach(function(k){
+   var v=mergeChanges(base&&base[k],mine[k],theirs[k],path.concat(k),issues);if(v!==undefined)out[k]=v;
+  });return out;
+ }
+ issues.push({path:path,mine:copyValue(mine),theirs:copyValue(theirs)});return copyValue(mine);
+}
+function setMergedValue(obj,path,value){var p=obj;for(var i=0;i<path.length-1;i++){if(!p[path[i]])p[path[i]]={};p=p[path[i]]}if(value===undefined)delete p[path[path.length-1]];else p[path[path.length-1]]=copyValue(value)}
+function conflictLabel(path){var labels={title:"Название мероприятия",date:"Дата мероприятия",mountDate:"Монтажный день",mount:"Время монтажа",rehearsal:"Прогоны",rehearsalDay:"День прогонов",start:"Начало мероприятия",end:"Завершение",status:"Статус",manager:"Менеджер",padmin:"Администратор проекта",notes:"Общие примечания",halls:"Выбранные залы",hallRoles:"Назначение залов",items:"Список оборудования и задач",note:"Примечание",staff:"Персонал",chief:"Бригадир",files:"Файлы",links:"Ссылки",docs:"Документы",spec:"Параметры сцены",name:"Название / имя",phone:"Телефон",qty:"Количество",w:"Ширина сцены",d:"Глубина сцены",h:"Высота сцены"};
+ var parts=[];path.forEach(function(k){var hall=hallById(k),cat=CATS.filter(function(c){return c.id===k})[0];if(hall)parts.push(hall.name);else if(cat)parts.push(cat.name);else if(labels[k])parts.push(labels[k])});return parts.join(" · ")||"Данные мероприятия";
+}
+function readableValue(v){if(v===undefined||v===null||v==="")return "Убрано / не заполнено";if(Array.isArray(v))return v.length?v.map(function(x){return typeof x==="object"?readableValue(x):String(x)}).join("\n\n"):"Список пуст";if(typeof v==="object")return Object.keys(v).filter(function(k){return ["id","path","uploadedAt","uploading"].indexOf(k)<0}).map(function(k){var label={role:"Роль",url:"Ссылка",size:"Размер файла (байт)"}[k]||conflictLabel([k]);return label+": "+readableValue(v[k])}).join("\n");return String(v)}
+function draftStorageKey(){return "tz-drafts-"+myEmail().toLowerCase()}
+function drafts(){return myEmail()?ls.get(draftStorageKey())||{}:{}}
+var draftWarning=false;
+function persistDraft(){
+ if(!isAdmin||!editing||!dirty)return true;
+ var all=drafts();all[editing.id]={event:cleanEvent(editing),isNew:!!editing._new,uploaded:editing._uploaded||[],base:editingBase,version:editingVersion,at:Date.now()};
+ try{localStorage.setItem(draftStorageKey(),JSON.stringify(all));return true}catch(e){if(!draftWarning){draftWarning=true;toast("Не удалось сохранить черновик на устройстве. Не закрывайте редактор — сохраните ТЗ.")}return false}
+}
+function dropDraft(id){var all=drafts();delete all[id];ls.set(draftStorageKey(),all)}
+function recoverDraft(id){
+ if(busy)return;var d=drafts()[id];if(!d)return;
+ if(editing&&dirty&&editing.id!==id&&!persistDraft())return;
+ editing=clone(d.event);editing._new=!!d.isNew;editing._uploaded=d.uploaded||[];editingBase=clone(d.base||d.event);editingVersion=d.version;
+ editingOrig=allPaths(editingBase);dirty=true;conflict=null;modal=null;exitArmed=false;ensureBlocks(editing);
+ history.replaceState(null,"",location.pathname+location.search+"#ev-"+id);render();toast("Черновик восстановлен. Проверьте и сохраните ТЗ.");
+}
+function bookingConflicts(ev,events){if(!ev.date||!(ev.halls||[]).length||ev.deletedAt)return [];return events.filter(function(other){return other.id!==ev.id&&!other.deletedAt&&other.date===ev.date&&(other.halls||[]).some(function(h){return ev.halls.indexOf(h)>=0})})}
+async function verifyBooking(ev){
+ if(!ev.date||!(ev.halls||[]).length||ev.deletedAt)return true;
+ var r=await sb.from("events").select("id,data").eq("data->>date",ev.date).neq("id",ev.id);
+ if(r.error)throw r.error;
+ var matches=bookingConflicts(ev,(r.data||[]).map(function(row){var e=clone(row.data);e.id=row.id;return e}));
+ if(matches.length){modal={t:"booking",event:ev,matches:matches};render();return false}return true;
+}
+function saveEvent(ev,isNew,unused,retried){return performSave(ev,isNew,!!retried)}
+async function performSave(ev,isNew,retried){
+ if(!isAdmin||busy)return false;
+ var data=cleanEvent(ev);busy=true;showSaving(true);
+ try{
+  if(!await verifyBooking(data)){busy=false;showSaving(false);return false}
+  var q=isNew?sb.from("events").insert({id:ev.id,data:data}):sb.from("events").update({data:data}).eq("id",ev.id).eq("version",editingVersion);
+  var r=await q.select("id,version");if(r.error)throw r.error;
+  if(!r.data||!r.data.length){
+   if(isNew)throw Error("Не удалось создать ТЗ. Проверьте права доступа.");
+   var latest=await sb.from("events").select("id,data,version").eq("id",ev.id).maybeSingle();if(latest.error)throw latest.error;
+   busy=false;showSaving(false);
+   if(!latest.data||latest.data.data.deletedAt){conflict={ev:ev,deleted:true};persistDraft();render();return false}
+   var issues=[],remote=cleanEvent(latest.data.data),base=cleanEvent(editingBase||{});
+   var merged=mergeChanges(base,data,remote,[],issues);merged.id=ev.id;
+   if(!issues.length&&!retried){
+    var uploads=editing&&editing._uploaded||[];editing=clone(merged);editing._uploaded=uploads;editingBase=clone(remote);editingVersion=latest.data.version;dirty=true;persistDraft();
+    return performSave(merged,false,true);
+   }
+   conflict={ev:ev,merged:merged,issues:issues,choices:{},version:latest.data.version,remote:remote};persistDraft();render();return false;
+  }
+  dropDraft(ev.id);editingOrig=[];editing=null;dirty=false;exitArmed=false;conflict=null;
+  busy=false;showSaving(false);toast(retried?"Сохранено вместе с независимыми правками коллеги":"Сохранено");await loadAll();
+  if(route()!==ev.id)location.hash="ev-"+ev.id;else render();return true;
+ }catch(e){return fail(e)}
+}
+function applyConflictChoices(){
+ if(!conflict||busy||conflict.deleted)return;
+ var c=conflict;if(c.issues.some(function(x,i){return !c.choices[i]})){toast("Выберите вариант для каждого спорного поля");return}
+ var ev=clone(c.merged);c.issues.forEach(function(x,i){setMergedValue(ev,x.path,c.choices[i]==="mine"?x.mine:x.theirs)});
+ var uploads=editing&&editing._uploaded||[];editing=clone(ev);editing._uploaded=uploads;editingBase=clone(c.remote);editingVersion=c.version;conflict=null;dirty=true;renewChangedTasks(editing,editingBase);persistDraft();saveEvent(clone(editing),false,false,true);
+}
+function deleteEvent(id){return setDeleted(id,true)}
+async function setDeleted(id,deleted){
+ if(!isAdmin||busy)return false;var ev=evById(id);if(!ev)return false;var data=cleanEvent(ev),version=versions[id];
+ if(deleted){data.deletedAt=new Date().toISOString();data.deletedBy=myEmail()}else{delete data.deletedAt;delete data.deletedBy}
+ busy=true;showSaving(true);
+ try{
+  if(!deleted&&!await verifyBooking(data)){busy=false;showSaving(false);return false}
+  var r=await sb.from("events").update({data:data}).eq("id",id).eq("version",version).select("id");if(r.error)throw r.error;
+  busy=false;showSaving(false);
+  if(!r.data||!r.data.length){toast("Коллега изменил это ТЗ. Данные обновлены — проверьте их перед повторным действием.");await loadAll();return false}
+  modal=null;toast(deleted?"ТЗ перемещено в корзину. Его можно восстановить.":"ТЗ восстановлено");go(null);await loadAll();return true;
+ }catch(e){return fail(e,deleted?"Не удалось переместить в корзину":"Не удалось восстановить")}
 }
 
 /* ---------- UI bits ---------- */
@@ -332,8 +407,9 @@ function topBar(){
 }
 function conflictBanner(){
  if(!conflict)return "";
- return '<div class="banner"><div class="banner-in gut"><p>Пока вы редактировали, другой администратор сохранил это ТЗ. Можно записать вашу версию поверх или взять его версию.</p>'+
- '<button class="btn primary sm" data-act="force">Сохранить мою версию</button><button class="btn sm" data-act="take-theirs">Взять его версию</button></div></div>';
+ if(conflict.deleted)return '<div class="banner"><div class="banner-in gut"><p>Это ТЗ удалено другим администратором. Ваши правки остались в редакторе и черновике.</p><button class="btn primary sm" data-act="save-as-new">Продолжить как новое ТЗ</button></div></div>';
+ var c=conflict;
+ return '<section class="banner merge-banner"><div class="banner-in gut"><p><b>Вы с коллегой изменили ТЗ.</b> Независимые правки уже объединены. Для спорных данных выберите, что оставить.</p><div class="merge-fields">'+c.issues.map(function(x,i){return '<fieldset class="merge-field"><legend>'+esc(conflictLabel(x.path))+'</legend><div class="merge-options">'+["mine","theirs"].map(function(side){return '<button type="button" class="merge-option'+(c.choices[i]===side?' selected':'')+'" data-act="merge-choice" data-i="'+i+'" data-side="'+side+'" aria-pressed="'+(c.choices[i]===side)+'"><b>'+(side==="mine"?'Ваш вариант':'Вариант коллеги')+'</b><span>'+esc(readableValue(x[side]))+'</span></button>'}).join("")+'</div></fieldset>'}).join("")+'</div><button class="btn primary sm" data-act="merge-save">Сохранить выбранное</button><button class="btn sm" data-act="close-conflict">Продолжить редактировать</button></div></section>';
 }
 
 /* ---------- board ---------- */
@@ -341,7 +417,7 @@ function boardView(){
  if(!loaded)return topBar()+'<div class="sheet gut"><div class="no-halls">Загрузка…</div></div>';
  if(loadError)return topBar()+'<div class="sheet gut"><div class="no-halls">Не удалось загрузить ТЗ: '+esc(loadError)+'<br><br><button class="btn" data-act="retry">Повторить</button></div></div>';
  var q=query.trim().toLowerCase();
- var list=state.events.filter(function(e){if(!q)return true;var hay=(e.title+" "+evHalls(e).map(function(h){return h.name}).join(" ")+" "+fmtDate(e.date)).toLowerCase();return hay.indexOf(q)>=0});
+ var list=state.events.filter(function(e){if(e.deletedAt)return false;if(!q)return true;var hay=(e.title+" "+evHalls(e).map(function(h){return h.name}).join(" ")+" "+fmtDate(e.date)).toLowerCase();return hay.indexOf(q)>=0});
  var cols=STATUSES.map(function(st){
   var items=list.filter(function(e){return (e.status||"draft")===st.id}).sort(function(a,b){var r=(a.date||"9").localeCompare(b.date||"9");return st.id==="done"?-r:r});
   return '<section class="col st-'+st.id+'" data-col="'+st.id+'"><div class="col-h"><span class="dot"></span><h2>'+st.name+'</h2><span class="n">'+items.length+'</span></div>'+
@@ -443,6 +519,7 @@ function badge(id){var m=curMarks[id];return m?'<span class="chg chg-'+m+'">'+(m
 function sheetView(id){
  var isEdit=editing&&editing.id===id;
  var ev=isEdit?editing:evById(id);
+ if(ev&&ev.deletedAt)ev=null;
  if(!ev)return topBar()+'<div class="sheet gut">'+(isAdmin?'<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button></div>':'')+'<div class="no-halls">'+(!loaded?"Загрузка…":loadError?"Не удалось загрузить ТЗ: "+esc(loadError)+'<br><br><button class="btn" data-act="retry">Повторить</button>':"ТЗ не найдено. Проверьте ссылку или попросите администратора прислать новую.")+'</div></div>';
  if(isEdit){curDiff=null;curMarks={};return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
  if(checksFor!==ev.id){checksFor=ev.id;checks={};checksKey="";loadChecks(ev.id)}
@@ -585,7 +662,7 @@ function catEdit(ev,hid,c){
 }
 function editBar(){
  return '<div class="editbar gut"><div class="editbar-in"><span class="msg">'+(dirty?"Есть несохранённые изменения":"Режим редактирования")+'</span>'+
-  (exitArmed?'<button class="btn danger" data-act="discard">Выйти без сохранения</button>':'<button class="btn" data-act="cancel">Отмена</button>')+
+  (exitArmed?'<button class="btn danger" data-act="discard">Сохранить черновик и выйти</button>':'<button class="btn" data-act="cancel">Отмена</button>')+
   '<button class="btn primary" data-act="save">Сохранить</button></div></div>';
 }
 function datalists(){return CATS.map(function(c){return '<datalist id="dl-'+c.id+'">'+SUGGEST[c.id].map(function(s){return '<option value="'+esc(s)+'">'}).join("")+'</datalist><datalist id="dr-'+c.id+'">'+ROLES[c.id].map(function(s){return '<option value="'+esc(s)+'">'}).join("")+'</datalist>'}).join("")+'<datalist id="dl-hallroles">'+HALL_ROLES.map(function(s){return '<option value="'+esc(s)+'">'}).join("")+'</datalist>'}
@@ -595,6 +672,11 @@ function modalView(){
  if(!modal)return "";
  if(modal.t==="releases")return isAdmin?releasesView():"";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
+ if(modal.t==="leave")return wrap('<h2>Есть несохранённые правки</h2><p>Можно остаться в редакторе или сохранить черновик в этом браузере и перейти дальше.</p><div class="bar"><button class="btn" data-act="stay">Остаться</button><button class="btn primary" data-act="leave-draft">Сохранить черновик и перейти</button></div>',"Несохранённые правки");
+ if(modal.t==="recover")return isAdmin?wrap('<h2>Найден ваш черновик</h2><p>Для этого ТЗ в браузере остались несохранённые правки.</p><div class="bar"><button class="btn primary" data-act="recover-draft" data-id="'+esc(modal.id)+'">Восстановить черновик</button><button class="btn" data-act="open-saved" data-id="'+esc(modal.id)+'">Удалить черновик и открыть сохранённое</button></div>',"Ваш черновик"):"";
+ if(modal.t==="drafts")return isAdmin?wrap('<h2>Мои черновики</h2><p class="hint">Хранятся только в этом браузере под вашей почтой. Коллеги их не видят. Очистка данных браузера удаляет черновики.</p>'+Object.keys(drafts()).map(function(id){var x=drafts()[id];return '<div class="req"><div class="req-i"><b>'+esc(x.event.title||"Без названия")+'</b><span class="hint">'+esc(new Date(x.at).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="recover-draft" data-id="'+esc(id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Мои черновики"):"";
+ if(modal.t==="trash")return isAdmin?wrap('<h2>Корзина</h2><p class="hint">ТЗ можно вернуть на доску вместе с содержимым и вложениями.</p>'+state.events.filter(function(e){return !!e.deletedAt}).sort(function(a,b){return b.deletedAt.localeCompare(a.deletedAt)}).map(function(e){return '<div class="req"><div class="req-i"><b>'+esc(e.title||"Без названия")+'</b><span class="hint">'+esc(fmtDate(e.date))+' · удалено '+esc(new Date(e.deletedAt).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="restore" data-id="'+esc(e.id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Корзина"):"";
+ if(modal.t==="booking")return isAdmin?wrap('<h2>Зал уже указан в другом мероприятии</h2><p>На '+esc(fmtDate(modal.event.date))+' выбранные залы есть в следующих ТЗ:</p><ul>'+modal.matches.map(function(e){return '<li><b>'+esc(e.title||"Без названия")+'</b> — '+esc((e.halls||[]).filter(function(h){return modal.event.halls.indexOf(h)>=0}).map(function(h){return (hallById(h)||{name:h}).name}).join(", "))+'</li>'}).join("")+'</ul><p class="hint">Проверьте дату или выбор залов. Ваши правки сохранены в редакторе.</p><button class="btn primary" data-act="close">Вернуться</button>',"Проверка занятости залов"):"";
  if(modal.t==="me")return wrap('<h2>Как вас зовут?</h2><p class="hint">Имя будет видно рядом с вашими отметками «сделано», чтобы все понимали, кто что выполнил.</p><form id="me-form" class="halls-row"><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(storedMe())+'"><div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div></form>',"Ваше имя");
  if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(DEPTS.map(function(c){return {d:c.id,n:c.name}}));
   return wrap('<h2>Ссылки для техников</h2><p class="hint">Ссылка отдела сразу открывает только его блоки. Техник может переключить отдел сам.</p><div class="linkopts">'+opts.map(function(o){var u=linkFor(modal.id,o.d),iid="lk-"+(o.d||"all");
@@ -662,6 +744,7 @@ function render(){
  else if(id)body=sheetView(id);
  else body=authView();
  app.classList.toggle("admin-layout",isAdmin&&!id);
+ if(editing&&dirty)persistDraft();
  app.innerHTML=body+(isAdmin&&!id?adminFooter():"")+(isAdmin?datalists():'')+modalView();
  window.scrollTo(0,y);
  if(aid){var el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
@@ -669,8 +752,13 @@ function render(){
 
 /* ---------- events ---------- */
 function newEvent(status){return {id:uid(),title:"",date:"",mount:"",rehearsal:"",start:"",end:"",status:status||"draft",halls:[],notes:"",blocks:{},_new:true}}
-function startEdit(ev){editingBase=clone(ev);editingOrig=allPaths(ev);editing=clone(ev);editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing)}
-function leaveEdit(){if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id,true);var wasNew=editing&&editing._new;editing=null;dirty=false;exitArmed=false;pickerOpen=false;conflict=null;if(wasNew)go(null);else render()}
+function startEdit(ev){if(editing&&dirty&&editing.id!==ev.id&&!persistDraft())return false;if(drafts()[ev.id]){modal={t:"recover",id:ev.id};render();return false}editingBase=clone(ev);editingOrig=allPaths(ev);editing=clone(ev);editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing);return true}
+function leaveEdit(keepDraft){
+ if(keepDraft&&dirty&&!persistDraft())return false;
+ if(!keepDraft&&editing){dropDraft(editing.id);if(editing._uploaded)removeFiles(editing._uploaded,editing.id,true)}
+ var wasNew=editing&&editing._new;editing=null;dirty=false;exitArmed=false;pickerOpen=false;conflict=null;
+ if(wasNew)go(null);else render();return true;
+}
 function moveItem(h,c,from,to){
  var arr=editing&&editing.blocks[h]&&editing.blocks[h][c]&&editing.blocks[h][c].items;if(!arr)return;
  if(to<0||to>=arr.length||from===to)return;
@@ -693,6 +781,7 @@ function saveEditing(){
  if(busy)return;
  if(uploading(editing)){toast("Дождитесь окончания загрузки файлов");return}
  renewChangedTasks(editing,editingBase);
+ persistDraft();
  var ev=clone(editing);var isNew=!!ev._new;
  if(!(ev.title||"").trim())ev.title="Без названия";
  saveEvent(ev,isNew,false);
@@ -707,7 +796,7 @@ app.addEventListener("click",function(e){
  switch(a){
   case "back":
    if(editing&&dirty&&!exitArmed){exitArmed=true;render();return}
-   if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id,true);editing=null;dirty=false;exitArmed=false;delArmed=false;conflict=null;go(null);break;
+   if(leaveEdit(true)){delArmed=false;go(null)}break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
@@ -715,16 +804,26 @@ app.addEventListener("click",function(e){
   case "recheck":checkAdmin();break;
   case "account":modal={t:"account"};render();break;
   case "logout":sb.auth.signOut().then(function(){modal=null;editing=null;auth.tab="in";if(route()&&isAdmin){history.replaceState(null,"",location.pathname)}toast("Вы вышли")});break;
-  case "new":var ev=newEvent(d.st);startEdit(ev);editing._new=true;location.hash="ev-"+ev.id;break;
-  case "edit":var x=evById(d.id);if(x){startEdit(x);render()}break;
+  case "new":var ev=newEvent(d.st);if(!startEdit(ev))break;editing._new=true;location.hash="ev-"+ev.id;break;
+  case "edit":var x=evById(d.id);if(x&&startEdit(x)){render()}break;
   case "cancel":if(dirty){exitArmed=true;render()}else leaveEdit();break;
-  case "discard":leaveEdit();break;
+  case "discard":leaveEdit(true);break;
   case "save":saveEditing();break;
-  case "force":if(conflict)saveEvent(conflict.ev,false,true);break;
+  case "merge-choice":if(conflict){conflict.choices[+d.i]=d.side;render()}break;
+  case "merge-save":applyConflictChoices();break;
+  case "close-conflict":conflict=null;render();break;
+  case "save-as-new":if(editing){var oldId=editing.id;editing.id=uid();editing._new=true;delete editing.deletedAt;delete editing.deletedBy;editing.status="draft";editingVersion=null;conflict=null;dirty=true;if(persistDraft())dropDraft(oldId);history.replaceState(null,"",location.pathname+location.search+"#ev-"+editing.id);render()}break;
+  case "trash":if(isAdmin){modal={t:"trash"};render()}break;
+  case "restore":setDeleted(d.id,false);break;
+  case "drafts":if(isAdmin){modal={t:"drafts"};render()}break;
+  case "recover-draft":recoverDraft(d.id);break;
+  case "open-saved":dropDraft(d.id);modal=null;var stored=evById(d.id);if(stored&&!stored.deletedAt&&startEdit(stored)){location.hash="ev-"+stored.id;render()}else render();break;
+  case "stay":modal=null;render();break;
+  case "leave-draft":var target=modal&&modal.target;if(target!=null&&leaveEdit(true)){modal=null;location.hash=target;render()}break;
   case "take-theirs":if(editing&&editing._uploaded)removeFiles(editing._uploaded,editing.id,true);conflict=null;editing=null;dirty=false;loadAll();break;
   case "dup":var src=evById(d.id);if(!src)return;var cp=cleanEvent(src);cp.id=uid();cp.title=(cp.title||"")+" (копия)";cp.status="draft";
    Object.keys(cp.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=cp.blocks[h][c.id];if(b)b.items.forEach(function(i){i.id=uid()})})});
-   startEdit(cp);editing._new=true;dirty=true;location.hash="ev-"+cp.id;break;
+   if(!startEdit(cp))break;editing._new=true;dirty=true;location.hash="ev-"+cp.id;break;
   case "del":if(!delArmed){delArmed=true;render();setTimeout(function(){if(delArmed){delArmed=false;render()}},4000);return}
    delArmed=false;deleteEvent(d.id);break;
   case "copy":modal={t:"links",id:d.id};render();break;
@@ -823,6 +922,7 @@ app.addEventListener("input",function(e){
   else editing[d.f]=t.value;
   if(!dirty||exitArmed){dirty=true;exitArmed=false;var m=document.querySelector(".editbar .msg");if(m)m.textContent="Есть несохранённые изменения"}
  }
+ if(d.f&&editing)persistDraft();
  if(t.id==="q"){query=t.value;render()}
  if(d.hallname!=null&&modal)modal.halls[+d.hallname].name=t.value;
 });
@@ -835,7 +935,7 @@ app.addEventListener("change",function(e){
 });
 document.addEventListener("click",function(e){if(pickerOpen&&!e.target.closest(".picker")){pickerOpen=false;render()}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(modal){var returnToVersion=modal.t==="releases";modal=null;render();if(returnToVersion){var vb=document.getElementById("app-version");if(vb)vb.focus()}}else if(pickerOpen){pickerOpen=false;render()}}});
-window.addEventListener("beforeunload",function(e){if(editing&&dirty){e.preventDefault();e.returnValue=""}});
+window.addEventListener("beforeunload",function(e){if(editing&&dirty){persistDraft();e.preventDefault();e.returnValue=""}});
 
 /* drag & drop cards between columns */
 var dragId=null;
@@ -864,7 +964,10 @@ app.addEventListener("dragend",function(){itemDrag=null;clearDropMarks();documen
 
 window.addEventListener("hashchange",function(){
  var id=route();delArmed=false;
- if(editing&&editing.id!==id){if(!dirty)editing=null}
+ if(editing&&editing.id!==id){
+  if(dirty){var target=location.hash;history.replaceState(null,"",location.pathname+location.search+"#ev-"+editing.id);modal={t:"leave",target:target};persistDraft();render();return}
+  editing=null;
+ }
  pickerOpen=false;
  if(authReady&&!isAdmin&&id&&!evById(id)){loaded=false;loadTech(id)}
  render();window.scrollTo(0,0);
@@ -887,4 +990,5 @@ sb.auth.onAuthStateChange(function(ev,s){
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&!editing&&authReady)scheduleReload()});
 setInterval(function(){if(authReady&&!isAdmin&&route()&&!document.hidden)loadTech(route())},60000);
 })();
+
 
