@@ -480,3 +480,6 @@ body{--bg:#f8f8f6;--ink:#20211f;--muted:#565c55;--line:#c8cbc5;--hero:#dfebfd;--
 .dlg h2,.auth-brand{background:var(--hero);border-radius:8px;padding:12px}
 .editbar,.event-sheet .bar{gap:8px}
 .event-sheet .cat:has(input:not([type=checkbox])){background:var(--surface);padding:14px}
+
+#profile-form{display:grid;gap:16px}
+#profile-form>.btn{justify-self:start}
