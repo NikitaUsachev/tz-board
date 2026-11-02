@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+  {"version":"28.5.2","date":"2 ноября 2026","title":"Готовность зала","groups":[{"title":"Страница техника","items":["Под названием зала видно, сколько пунктов осталось отметить в каждом отделе. После последнего пункта появляется кнопка подтверждения."]}]},
   {"version":"28.5.1","date":"2 ноября 2026","title":"Готовность зала","groups":[{"title":"Для техника","items":["Кнопка «Зал готов» появляется, когда выполнены все пункты зала во всех отделах."]}]},
   {
   "version": "28.5",
@@ -364,26 +365,33 @@ function telegramLink(ev){
  if(isAdmin||telegramEvent?.id!==ev.id||!/^[A-Za-z0-9_-]{1,64}$/.test(ev.id))return "";
  return '<p><a class="btn" target="_blank" rel="noopener noreferrer" href="https://t.me/'+telegramEvent.username+'?start='+encodeURIComponent(ev.id)+'">Получать изменения в Telegram</a></p>';
 }
-function hallTasksDone(ev,hall){
- var blocks=ev&&ev.blocks&&ev.blocks[hall];
- if(!blocks||checksFor!==ev.id)return false;
- var ids=CATS.flatMap(function(category){
-  var block=blocks[category.id];
-  if(!block)return [];
-  var items=(block.items||[]).filter(function(item){return (item.name||"").trim()}).map(function(item){return item.id});
-  return category.id==="stage"?items.concat(specTasks(block)):items;
+function hallProgress(ev,hall){
+ var blocks=ev&&ev.blocks&&ev.blocks[hall],total=0,remaining=[];
+ CATS.forEach(function(category){
+  var block=blocks&&blocks[category.id];if(!block)return;
+  var ids=(block.items||[]).filter(function(item){return (item.name||"").trim()}).map(function(item){return item.id});
+  if(category.id==="stage")ids=ids.concat(specTasks(block));
+  total+=ids.length;
+  var left=ids.filter(function(id){return checksFor!==ev.id||!id||!checks[id]||checks[id].pending}).length;
+  if(left)remaining.push(category.name+" — "+left);
  });
- return ids.length>0 && ids.every(function(id){return id&&checks[id]&&!checks[id].pending});
+ return {done:total>0&&!remaining.length,total:total,remaining:remaining};
 }
 function readyButton(ev,h){
- if(isAdmin||!window.TZ_CONFIG.telegram||ev.status==="done"||!hallTasksDone(ev,h.id))return "";
+ if(isAdmin||!window.TZ_CONFIG.telegram||ev.status==="done")return "";
+ var progress=hallProgress(ev,h.id);
  var name=telegramEvent?.id===ev.id && telegramEvent.ready[h.id];
- if(typeof name==="string")return '<p class="hint">Готов к прогонам · '+esc(name)+'</p>';
- return '<button class="btn" data-act="tg-ready" data-h="'+esc(h.id)+'">Зал готов</button>';
+ var confirmed=typeof name==="string"?'<p class="hint">Готовность уже подтвердил: '+esc(name)+'</p>':'';
+ if(!progress.total)return confirmed;
+ if(!progress.done){
+  var all=deptsFor(ev.id).length===DEPTS.length;
+  return confirmed+'<p class="hint">Осталось отметить: '+esc(progress.remaining.join(", "))+'. '+(all?'':'<button class="linkbtn" data-act="dept" data-dept="all">Показать все отделы</button>')+'</p>';
+ }
+ return confirmed||'<button class="btn primary" data-act="tg-ready" data-h="'+esc(h.id)+'">Зал готов</button>';
 }
 function sendHallReady(button,hall){
  var id=route(),name=storedMe();
- if(isAdmin||!window.TZ_CONFIG.telegram||!id||!hallTasksDone(evById(id),hall))return;
+ if(isAdmin||!window.TZ_CONFIG.telegram||!id||!hallProgress(evById(id),hall).done)return;
  if(!name||!Object.values(checks).some(function(check){return check.by===name})){toast("Сначала отметьте выполненный пункт в этом ТЗ");return}
  button.disabled=true;
  sb.rpc("tg_hall_ready",{p_event:id,p_hall:hall,p_name:name}).then(function(r){
@@ -434,7 +442,7 @@ function setCheck(evid,item,done){
   delete checkPending[key];
   if(route()!==evid)return;
   if(r.error){if(prev)checks[item]=prev;else delete checks[item];render();toast("Не удалось сохранить отметку: "+r.error.message);return}
-  if(checks[item])delete checks[item].pending;loadChecks(evid);
+  if(checks[item])delete checks[item].pending;if(!editing&&!modal)render();loadChecks(evid);
  },function(){delete checkPending[key];if(route()!==evid)return;if(prev)checks[item]=prev;else delete checks[item];render();toast("Не удалось сохранить отметку: ошибка сети")});
 }
 setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
