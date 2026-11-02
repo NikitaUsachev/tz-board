@@ -23,13 +23,14 @@ async function boot(admin,deleted=false){
  return {c,app,click,hash,store,listeners,rows};
 }
 (async()=>{
- const a=await boot(true);assert.match(a.app.innerHTML,/Версия 28.3/);assert.match(a.app.innerHTML,/Корзина/);
+ const a=await boot(true);assert.match(a.app.innerHTML,/Версия \d+(?:\.\d+)+/);assert.match(a.app.innerHTML,/Корзина/);
  assert.match(a.app.innerHTML,/version-link has-update/);a.click('releases');assert.ok(!a.app.innerHTML.includes('version-link has-update'));a.click('close');a.click('new',{st:'draft'});a.hash();
  for(const f of a.listeners.input)f({target:{dataset:{f:'title'},value:'My draft'}});
  a.c.location.hash='';a.hash();assert.match(a.app.innerHTML,/Есть несохранённые правки/);
  a.click('leave-draft');a.hash();assert.match(a.app.innerHTML,/Несохранённые изменения \(1\)/);
  const saved=JSON.parse(a.store.get('tz-drafts-admin@example.com'));const id=Object.keys(saved)[0];assert.equal(saved[id].event.title,'My draft');
  a.click('recover-draft',{id});assert.match(a.app.innerHTML,/My draft/);a.click('save');await tick();await tick();assert.ok(a.rows.some(r=>r.data.title==='My draft'));
+ const adminSheet=await boot(true);adminSheet.c.location.hash='ev-E';adminSheet.hash();assert.match(adminSheet.app.innerHTML,/Known event/);for(const action of ['drafts','trash','releases'])assert.ok(adminSheet.app.innerHTML.includes('data-act="'+action+'"'));
  const t=await boot(false);assert.ok(!t.app.innerHTML.includes('Несохранённые изменения'));assert.ok(!t.app.innerHTML.includes('Корзина'));assert.ok(!t.app.innerHTML.includes('Зарегистрироваться'));assert.match(t.app.innerHTML,/Known event/);
  for(const f of t.listeners.change)f({target:{dataset:{done:'E|item'},checked:true}});assert.match(t.app.innerHTML,/Как вас зовут/);
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);

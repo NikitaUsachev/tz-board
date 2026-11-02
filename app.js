@@ -22,6 +22,19 @@ var app=document.getElementById("app");
 
 var RELEASES=[
   {
+  "version": "28.4.1",
+  "date": "2 ноября 2026",
+  "title": "Кнопки администратора",
+  "groups": [
+    {
+      "title": "На доске и в ТЗ",
+      "items": [
+        "Кнопки «Несохранённые изменения», «Корзина» и «Что нового» видны внизу доски даже при длинном списке мероприятий. Их также можно открыть при просмотре ТЗ администратором."
+      ]
+    }
+  ]
+},
+  {
   "version": "28.4",
   "date": "2 ноября 2026",
   "title": "Карточки мероприятий на доске",
@@ -888,7 +901,7 @@ function render(){
  else body=authView();
  app.classList.toggle("admin-layout",isAdmin&&!id);
  if(editing&&dirty)persistDraft();
- app.innerHTML=body+(isAdmin&&!id?adminFooter():"")+(isAdmin?datalists():'')+modalView();
+ app.innerHTML=body+(isAdmin&&!editing?adminFooter():"")+(isAdmin?datalists():'')+modalView();
  window.scrollTo(0,y);
  if(aid){var el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
 }

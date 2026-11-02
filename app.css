@@ -401,7 +401,10 @@ h4 .req-n{vertical-align:2px}
 /* Administrator version and release history */
 #app.admin-layout{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 .admin-layout>.board-wrap{flex:1}
-.admin-footer{padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px));text-align:center;color:var(--muted)}
+.admin-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));border-top:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.admin-layout>.admin-footer{position:sticky;bottom:0;z-index:5}
+.admin-footer .version-link{color:var(--ink)}
+.admin-footer .version-link.has-update{color:#141B26}
 .version-link{font:inherit;font-size:12px;color:var(--muted);border:0;border-radius:7px;background:transparent;cursor:pointer;padding:8px 12px;min-height:36px}
 .version-link:hover{color:var(--accent);background:var(--accent-soft)}
 .release-dialog{max-width:680px}
