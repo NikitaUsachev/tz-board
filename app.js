@@ -22,6 +22,20 @@ var app=document.getElementById("app");
 
 var RELEASES=[
   {
+  "version": "28.5",
+  "date": "2 ноября 2026",
+  "title": "Telegram для команды мероприятия",
+  "groups": [
+    {
+      "title": "После подключения бота",
+      "items": [
+        "На странице ТЗ можно подписаться на его изменения.",
+        "Кнопка «Зал готов» сообщает администраторам, какой зал готов к прогонам и кто это подтвердил."
+      ]
+    }
+  ]
+},
+  {
   "version": "28.4",
   "date": "2 ноября 2026",
   "title": "Карточки мероприятий на доске",
@@ -322,6 +336,38 @@ function loadAll(){
   loaded=true;loadError="";render();
  }).catch(function(e){if(request!==allRequest||!isAdmin||who!==myEmail())return;loadError=(e&&e.message)||"Нет связи с базой";loaded=true;render()});
 }
+var telegramEvent=null;
+function refreshTelegram(id,request){
+ if(!window.TZ_CONFIG.telegram)return;
+ sb.rpc("tg_event_info",{p_event:id}).then(function(r){
+  if(request!==techRequest||route()!==id||isAdmin)return;
+  var info=r.data;
+  var next=!r.error&&info&&/^[A-Za-z0-9_]{5,32}$/.test(info.username)?{id:id,username:info.username,ready:info.ready||{}}:null;
+  if(JSON.stringify(next)!==JSON.stringify(telegramEvent)){telegramEvent=next;if(!modal&&!editing)render()}
+ }).catch(function(){if(request===techRequest&&route()===id&&telegramEvent){telegramEvent=null;render()}});
+}
+function telegramLink(ev){
+ if(isAdmin||telegramEvent?.id!==ev.id||!/^[A-Za-z0-9_-]{1,64}$/.test(ev.id))return "";
+ return '<p><a class="btn" target="_blank" rel="noopener noreferrer" href="https://t.me/'+telegramEvent.username+'?start='+encodeURIComponent(ev.id)+'">Получать изменения в Telegram</a></p>';
+}
+function readyButton(ev,h){
+ if(isAdmin||telegramEvent?.id!==ev.id)return "";
+ var name=telegramEvent.ready[h.id];
+ if(typeof name==="string")return '<p class="hint">Готов к прогонам · '+esc(name)+'</p>';
+ return '<button class="btn" data-act="tg-ready" data-h="'+esc(h.id)+'">Зал готов</button>';
+}
+function sendHallReady(button,hall){
+ var id=route(),name=storedMe();
+ if(isAdmin||telegramEvent?.id!==id)return;
+ if(!name||!Object.values(checks).some(function(check){return check.by===name})){toast("Сначала отметьте выполненный пункт в этом ТЗ");return}
+ button.disabled=true;
+ sb.rpc("tg_hall_ready",{p_event:id,p_hall:hall,p_name:name}).then(function(r){
+  if(route()!==id)return;
+  if(r.error){toast(r.error.message||"Не удалось подтвердить готовность");return}
+  toast(r.data?"Готовность зала сохранена":"Зал уже готов");
+  refreshTelegram(id,techRequest);
+ }).catch(function(){toast("Не удалось подтвердить готовность. Проверьте связь")}).finally(function(){button.disabled=false});
+}
 function loadTech(id){
  if(!id){render();return Promise.resolve()}
  var request=++techRequest;
@@ -335,6 +381,7 @@ function loadTech(id){
   state.halls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
   var row=(r[1].data||[])[0],prevV=versions[id];if(row&&row.data&&row.data.deletedAt)row=null;versions={};
   state.events=row?[(function(){var e=row.data||{};e.id=row.id;e.updatedAt=Date.parse(row.updated_at)||0;versions[row.id]=row.version;return e})()]:[];
+  if(row)refreshTelegram(id,request);
   if(row){var seen=ls.get("tz-seen-"+row.id);if(!seen||!seen.d)markSeen(state.events[0]);
    else if(prevV!=null&&prevV!==row.version){toast("ТЗ обновлено администратором");flagTitle(true)}}
   if(loaded&&!loadError&&row&&prevV===row.version)return;
@@ -667,7 +714,7 @@ function sheetView(id){
  if(isEdit){curDiff=null;curMarks={};return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
  if(checksFor!==ev.id){checksFor=ev.id;checks={};checksKey="";loadChecks(ev.id)}
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);if(curDiff)storeMarks(ev,curDiff);curMarks=activeMarks(ev);
- return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+changesView(ev,curDiff,depts)+headView(ev,isEdit)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
+ return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+changesView(ev,curDiff,depts)+headView(ev,isEdit)+telegramLink(ev)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return '';
@@ -749,7 +796,7 @@ function hallsView(ev,isEdit,depts){
   var tot2=cats.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
   var hch=cats.some(function(c){return markCount(ev,h.id+"|"+c.id)});
   return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hallRole(ev,h.id)?'<span class="hall-role">'+esc(hallRole(ev,h.id))+'</span>':'')+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
-   (hc?'':'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
+   (hc?'':readyButton(ev,h)+'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
  }).join("")+(isEdit?'':'<p class="hint me-line">Отметки «сделано» видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
 }
 function chiefRead(b,k){if(!hasChief(b))return "";var m=curMarks["chief|"+k];
@@ -940,6 +987,7 @@ app.addEventListener("click",function(e){
   case "back":
    if(editing&&dirty&&!exitArmed){exitArmed=true;render();return}
    if(leaveEdit(true)){delArmed=false;go(null)}break;
+  case "tg-ready":sendHallReady(t,d.h);break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
