@@ -454,3 +454,19 @@ h4 .req-n{vertical-align:2px}
 /* Keep the attribution line in the layout before the first check. */
 .row .who,.ss-chk .who{display:block;height:18px;line-height:18px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hall-progress:not(:empty){min-height:48px;display:flow-root}
+
+/* Technician reading view */
+body:has(.technician-sheet){--bg:#f8f8f6;--ink:#20211f;--muted:#565c55;--line:#c8cbc5;--hero:#dfebfd;--stripe:#abc4ed}
+:root[data-theme="dark"] body:has(.technician-sheet){--bg:#141a20;--ink:#eff3f4;--muted:#b6bec5;--line:#495460;--hero:#213247;--stripe:#304962}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) body:has(.technician-sheet){--bg:#141a20;--ink:#eff3f4;--muted:#b6bec5;--line:#495460;--hero:#213247;--stripe:#304962}}
+.technician-sheet .head{position:relative;isolation:isolate;overflow:hidden;background:var(--hero);border:0;border-radius:18px;padding:clamp(18px,3vw,38px)}
+.technician-sheet .head::after{content:"";position:absolute;inset:0 0 auto auto;width:20%;height:12px;background:repeating-linear-gradient(120deg,var(--stripe) 0 6px,transparent 6px 12px);pointer-events:none}
+.technician-sheet .head h2{font-size:clamp(28px,4vw,48px);line-height:1.06;letter-spacing:-.04em}
+.technician-sheet .seg{display:flex;flex-wrap:wrap;gap:5px;background:none;border:0;padding:0}
+.technician-sheet .seg button{border:1px solid var(--line);border-radius:24px;color:var(--ink)}
+.technician-sheet .seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.technician-sheet .cat{border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;padding:12px 0}
+.technician-sheet .cat-h b::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--c)}
+.technician-sheet .row .q{font-weight:500;text-align:right}
+.technician-sheet .row.done{background:transparent}
+.technician-sheet .row.done .nm,.technician-sheet .row.done .q{text-decoration:none}

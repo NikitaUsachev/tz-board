@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.7","date":"2 ноября 2026","title":"Новый вид страницы техника","groups":[{"title":"Работа с ТЗ","items":["Шапка выделяет сведения о мероприятии. В списке оборудования количество стоит справа, а примечание — под названием позиции."]}]},
 {"version":"28.6.3","date":"2 ноября 2026","title":"Отметки без смещения списка","groups":[{"title":"Страница техника","items":["Подпись исполнителя занимает постоянную строку. При обновлении отметок открытая позиция сохраняет своё место на экране."]}]},
 {"version":"28.6.2","date":"2 ноября 2026","title":"Список оборудования","groups":[{"title":"На странице ТЗ","items":["Между соседними позициями оборудования добавлен отступ, чтобы примечания и отметки было проще читать."]}]},
 {"version":"28.6.1","date":"2 ноября 2026","title":"Отметки выполнения","groups":[{"title":"Страница техника","items":["При отметке задачи список обновляется на месте, сохраняя положение строки."]}]},
@@ -782,7 +783,7 @@ function sheetView(id){
  if(isEdit){curDiff=null;curMarks={};return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
  if(checksFor!==ev.id){checksFor=ev.id;checks={};checksKey="";loadChecks(ev.id)}
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);if(curDiff)storeMarks(ev,curDiff);curMarks=activeMarks(ev);
- return topBar()+'<div class="sheet gut">'+sheetBar(ev,isEdit)+changesView(ev,curDiff,depts)+headView(ev,isEdit)+telegramLink(ev)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
+ return topBar()+'<div class="sheet gut'+(isAdmin?'':' technician-sheet')+'">'+sheetBar(ev,isEdit)+changesView(ev,curDiff,depts)+headView(ev,isEdit)+telegramLink(ev)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return '';
