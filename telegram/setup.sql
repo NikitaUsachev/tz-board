@@ -2,10 +2,15 @@ begin;
 create schema if not exists tz_telegram;
 revoke all on schema tz_telegram from public, anon, authenticated;
 create table if not exists tz_telegram.bot (id boolean primary key check(id), username text not null, heartbeat timestamptz not null);
+alter table tz_telegram.bot enable row level security;
 create table if not exists tz_telegram.admin_chats (chat bigint primary key);
+alter table tz_telegram.admin_chats enable row level security;
 create table if not exists tz_telegram.subs (event text references public.events(id) on delete cascade, chat bigint, primary key(event,chat));
+alter table tz_telegram.subs enable row level security;
 create table if not exists tz_telegram.ready (event text references public.events(id) on delete cascade, hall text, technician text not null, primary key(event,hall));
+alter table tz_telegram.ready enable row level security;
 create table if not exists tz_telegram.outbox (id bigint generated always as identity primary key, chat bigint not null, event text references public.events(id) on delete cascade, kind text not null, message text not null, due timestamptz not null default now(), attempts int not null default 0);
+alter table tz_telegram.outbox enable row level security;
 create index if not exists tg_delivery on tz_telegram.outbox(due,id);
 create or replace function public.tg_event_info(p_event text) returns jsonb language sql stable security definer set search_path='' as $$
  select jsonb_build_object('username',b.username,'ready',coalesce((select jsonb_object_agg(r.hall,r.technician) from tz_telegram.ready r where r.event=e.id),'{}'::jsonb))
@@ -72,6 +77,7 @@ revoke all on function public.tg_event_info(text),public.tg_hall_ready(text,text
 grant execute on function public.tg_event_info(text),public.tg_hall_ready(text,text,text) to anon,authenticated;
 -- Only the Edge Function can process messages and deliver the queue.
 create table if not exists tz_telegram.updates (id bigint primary key, received timestamptz default now());
+alter table tz_telegram.updates enable row level security;
 alter table tz_telegram.outbox add column if not exists lease uuid;
 create or replace function public.tg_command(p_update bigint,p_chat bigint,p_command text,p_arg text,p_admin boolean)
 returns void language plpgsql security definer set search_path='' as $$
