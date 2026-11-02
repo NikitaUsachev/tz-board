@@ -131,7 +131,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .cat-h .n{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 .cat.empty{opacity:.75}
 .none{margin:0;color:var(--muted);font-size:14px}
-.rows{display:flex;flex-direction:column}
+.rows{display:flex;flex-direction:column;row-gap:8px}
 .row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:start;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
 .row:first-child{border-top:0}
 .row input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--c)}
