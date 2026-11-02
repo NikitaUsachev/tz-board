@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.7.2","date":"3 ноября 2026","title":"Профиль администратора","groups":[{"title":"Аккаунт","items":["В личном кабинете можно сохранить фамилию и имя. Они появятся на кнопке аккаунта и будут доступны при входе с другого устройства."]}]},
 {"version":"28.7.1","date":"2 ноября 2026","title":"Единый вид ТЗ","groups":[{"title":"Просмотр","items":["Обновлены доска, настройки и редактор. Администратор и техник видят единое оформление ТЗ."]}]},
 {"version":"28.7","date":"2 ноября 2026","title":"Новый вид страницы техника","groups":[{"title":"Работа с ТЗ","items":["Шапка выделяет сведения о мероприятии. В списке оборудования количество стоит справа, а примечание — под названием позиции."]}]},
 {"version":"28.6.3","date":"2 ноября 2026","title":"Отметки без смещения списка","groups":[{"title":"Страница техника","items":["Подпись исполнителя занимает постоянную строку. При обновлении отметок открытая позиция сохраняет своё место на экране."]}]},
@@ -338,6 +339,33 @@ function hashDept(){var m=/~(sound|light|video)$/.exec(location.hash);return m?m
 function go(id){if(id){location.hash="ev-"+id}else{if(location.hash){history.pushState(null,"",location.pathname+location.search)}render()}}
 function linkFor(id,dept){return location.origin+location.pathname+"#ev-"+id+(dept?"~"+dept:"")}
 function homeLink(){return location.origin+location.pathname}
+function accountProfile(){
+ var data=session?.user?.user_metadata||{};
+ return {first:typeof data.first_name==="string"?data.first_name:"",last:typeof data.last_name==="string"?data.last_name:""};
+}
+function accountLabel(){
+ var profile=accountProfile();
+ return [profile.last,profile.first].filter(Boolean).join(" ")||"Аккаунт";
+}
+function profileForm(){
+ return '<form id="profile-form"><label class="fld">Фамилия<input class="full" id="profile-last" autocomplete="family-name" maxlength="80" required value="'+esc(modal.last)+'"></label><label class="fld">Имя<input class="full" id="profile-first" autocomplete="given-name" maxlength="80" required value="'+esc(modal.first)+'"></label>'+(modal.err?'<p role="alert">'+esc(modal.err)+'</p>':'')+'<button class="btn primary" type="submit"'+(modal.saving?' disabled':'')+'>'+(modal.saving?'Сохраняем…':'Сохранить имя')+'</button></form>';
+}
+async function saveAccountProfile(){
+ var form=modal;
+ if(!isAdmin||!session||!form||form.t!=="account"||form.saving)return;
+ var first=form.first.trim(),last=form.last.trim();
+ if(!first||!last){form.err="Заполните фамилию и имя.";render();return}
+ var id=session.user.id;
+ form.saving=true;form.err="";render();
+ try{
+  var result=await sb.auth.updateUser({data:{first_name:first,last_name:last}});
+  if(result.error)throw result.error;
+  if(session?.user?.id!==id)return;
+  session.user=result.data.user;
+  if(modal===form){form.first=first;form.last=last;toast("Фамилия и имя сохранены")}
+ }catch(error){form.err="Не удалось сохранить имя. Проверьте соединение и повторите."}
+ finally{form.saving=false;if(modal===form)render()}
+}
 function myEmail(){return session&&session.user&&session.user.email||""}
 
 /* ---------- data ---------- */
@@ -656,7 +684,7 @@ function copyText(text){
 function topBar(){
  var mode=isAdmin?'<span class="mode admin">Администратор</span>':'';
  var onBoard=!route()&&isAdmin;
- var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(myEmail().split("@")[0])+' · Выйти</button>':'';
+ var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
  return '<header class="top"><div class="top-in gut">'+
   '<div class="brand"><h1>ТЗ на мероприятия</h1>'+mode+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
@@ -943,7 +971,7 @@ function modalView(){
    return '<div class="linkopt"><span class="lo-n">'+esc(o.n)+'</span><input id="'+iid+'" readonly value="'+esc(u)+'" aria-label="Ссылка: '+esc(o.n)+'"><button class="btn sm" data-act="copy-one" data-url="'+esc(u)+'" data-inp="'+iid+'">Копировать</button></div>'}).join("")+'</div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылки")}
  if(modal.t==="copy")return wrap('<h2>Ссылка на ТЗ</h2><p class="hint">Скопируйте и отправьте техникам.</p><div class="copybox"><input id="copy-in" readonly value="'+esc(modal.text)+'"></div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылка");
  if(modal.t==="newpass")return wrap('<h2>Новый пароль</h2><form id="newpass-form" class="halls-row"><input id="np-1" class="full" type="password" minlength="8" required autocomplete="new-password" placeholder="Новый пароль, от 8 символов"><input id="np-2" class="full" type="password" minlength="8" required autocomplete="new-password" placeholder="Повторите пароль">'+(modal.err?'<p class="hint" style="color:var(--danger)">'+esc(modal.err)+'</p>':'')+'<div class="bar"><span class="sp"></span><button type="submit" class="btn primary">Сохранить пароль</button></div></form>',"Новый пароль");
- if(modal.t==="account")return wrap('<h2>Аккаунт</h2><p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+'<p class="hint">Адрес для входа администраторов: <b class="mono" style="overflow-wrap:anywhere">'+esc(homeLink())+'</b></p>'+
+ if(modal.t==="account"&&isAdmin)return wrap('<h2>Аккаунт</h2><p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+profileForm()+'<p class="hint">Адрес для входа администраторов: <b class="mono" style="overflow-wrap:anywhere">'+esc(homeLink())+'</b></p>'+
   '<div class="bar"><span class="sp"></span><button class="btn" data-act="close">Закрыть</button><button class="btn danger" data-act="logout">Выйти</button></div>',"Аккаунт");
  if(modal.t==="settings"){
   var hs=modal.halls;
@@ -1063,7 +1091,7 @@ app.addEventListener("click",function(e){
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
   case "releases":if(isAdmin){markReleaseRead();modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
   case "recheck":checkAdmin();break;
-  case "account":modal={t:"account"};render();break;
+  case "account":if(isAdmin){modal=Object.assign({t:"account"},accountProfile());render()}break;
   case "logout":sb.auth.signOut().then(function(){modal=null;editing=null;auth.tab="in";if(route()&&isAdmin){history.replaceState(null,"",location.pathname)}toast("Вы вышли")});break;
   case "new":var ev=newEvent(d.st);if(!startEdit(ev))break;editing._new=true;location.hash="ev-"+ev.id;break;
   case "edit":var x=evById(d.id);if(x&&startEdit(x)){render()}break;
@@ -1134,6 +1162,7 @@ app.addEventListener("click",function(e){
 });
 app.addEventListener("submit",function(e){
  e.preventDefault();
+ if(e.target.id==="profile-form"){saveAccountProfile();return}
  if(e.target.id==="me-form"){var nm=(document.getElementById("me-in").value||"").trim().replace(/\s+/g," ").slice(0,60);if(!nm)return;saveMe(nm);modal=null;var pc=pendingCheck;pendingCheck=null;render();if(pc)setCheck(pc.ev,pc.item,pc.done);else toast("Имя сохранено");return}
  if(e.target.id==="auth-form"){
   var em=(document.getElementById("auth-email").value||"").trim(),pw=document.getElementById("auth-pass"),pw2=document.getElementById("auth-pass2");
@@ -1172,6 +1201,7 @@ app.addEventListener("submit",function(e){
 });
 app.addEventListener("input",function(e){
  var t=e.target,d=t.dataset;
+ if(modal?.t==="account"){if(t.id==="profile-last")modal.last=t.value;if(t.id==="profile-first")modal.first=t.value}
  if(d.f&&editing){
   if(d.f==="item"){editing.blocks[d.h][d.c].items[+d.i][d.k]=t.value}
   else if(d.f==="link"){editing.blocks[d.h][d.c].links[+d.i][d.k]=t.value}

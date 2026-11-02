@@ -7,7 +7,7 @@ async function boot(admin,deleted=false,telegram=false,done=[]){
  const app={classList:{toggle(){}},addEventListener:(n,f)=>(listeners[n]??=[]).push(f),get innerHTML(){return html},set innerHTML(v){html=v}};
  const ev={id:'E',title:'Known event',date:'2026-12-01',halls:['h'],status:'prep',blocks:{h:{sound:{items:[{id:'item',name:'Microphone',qty:'2'}],note:''}}}};if(deleted)ev.deletedAt='2026-11-01';
  const rows=[{id:'E',data:ev,version:1,updated_at:'2026-11-01T00:00:00Z'}];
- const sb={auth:{getSession:async()=>({data:{session:admin?{user:{id:'user',email:'admin@example.com'}}:null}}),onAuthStateChange(){}},rpc:async(name)=>({data:name==='is_admin'?true:name==='get_event_v2'?rows:name==='get_checks'?done:name==='tg_event_info'?{username:'example_tz_bot',ready:{}}:[]}),from(table){return new class{
+ const sb={auth:{getSession:async()=>({data:{session:admin?{user:{id:'user',email:'admin@example.com'}}:null}}),updateUser:async({data})=>({data:{user:{id:"user",email:"admin@example.com",user_metadata:data}}}),onAuthStateChange(){}},rpc:async(name)=>({data:name==='is_admin'?true:name==='get_event_v2'?rows:name==='get_checks'?done:name==='tg_event_info'?{username:'example_tz_bot',ready:{}}:[]}),from(table){return new class{
   constructor(){this.filters=[];this.op='read';this.single=false}
   select(){return this}eq(k,v){this.filters.push([k,v]);return this}neq(){return this}order(){return this}maybeSingle(){this.single=true;return this}insert(p){this.op='insert';this.p=p;return this}
   then(a,b){return Promise.resolve().then(()=>{let data=table==='events'?rows:table==='settings'?[{id:1,data:{halls:[{id:'h',name:'Main'}]},updated_at:'stamp'}]:[{email:'admin@example.com'}];if(this.op==='insert'){const r={...this.p,version:1,updated_at:'2026-11-01T00:00:00Z'};rows.push(r);data=[r]}else data=data.filter(r=>this.filters.every(([k,v])=>r[k]===v));return {data:this.single?(data[0]||null):JSON.parse(JSON.stringify(data))}}).then(a,b)}
@@ -30,6 +30,11 @@ async function boot(admin,deleted=false,telegram=false,done=[]){
  a.click('leave-draft');a.hash();assert.match(a.app.innerHTML,/Несохранённые изменения \(1\)/);
  const saved=JSON.parse(a.store.get('tz-drafts-admin@example.com'));const id=Object.keys(saved)[0];assert.equal(saved[id].event.title,'My draft');
  a.click('recover-draft',{id});assert.match(a.app.innerHTML,/My draft/);a.click('save');await tick();await tick();assert.ok(a.rows.some(r=>r.data.title==='My draft'));
+ const profile=await boot(true);profile.click("account");assert.match(profile.app.innerHTML,/profile-form/);
+ for(const [id,value] of [["profile-last","Усачёв"],["profile-first","Никита"]])for(const listen of profile.listeners.input)listen({target:{id,value,dataset:{}}});
+ for(const listen of profile.listeners.submit)listen({preventDefault(){},target:{id:"profile-form"}});
+ await tick();profile.click("close");assert.match(profile.app.innerHTML,/Усачёв Никита/);
+ profile.click("account");assert.match(profile.app.innerHTML,/value="Усачёв"/);
  const adminSheet=await boot(true);adminSheet.c.location.hash='ev-E';adminSheet.hash();assert.match(adminSheet.app.innerHTML,/Known event/);assert.match(adminSheet.app.innerHTML,/sheet gut event-sheet/);assert.match(adminSheet.app.innerHTML,/Редактировать/);for(const action of ['drafts','trash','releases'])assert.ok(adminSheet.app.innerHTML.includes('data-act="'+action+'"'));
  const t=await boot(false);assert.ok(!t.app.innerHTML.includes('Несохранённые изменения'));assert.ok(!t.app.innerHTML.includes('Корзина'));assert.ok(!t.app.innerHTML.includes('Зарегистрироваться'));assert.match(t.app.innerHTML,/Known event/);assert.match(t.app.innerHTML,/sheet gut event-sheet/);
  for(const f of t.listeners.change)f({target:{dataset:{done:'E|item'},checked:true}});assert.match(t.app.innerHTML,/Как вас зовут/);
