@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.6.1","date":"2 ноября 2026","title":"Отметки выполнения","groups":[{"title":"Страница техника","items":["При отметке задачи список обновляется на месте, сохраняя положение строки."]}]},
   {"version":"28.6","date":"2 ноября 2026","title":"Новое оформление доски и ТЗ","groups":[{"title":"Чтение","items":["Названия мероприятий, залов и оборудования получили более лёгкое начертание. Прямые линии разделяют залы и рабочие блоки."]}]},
   {"version":"28.5.2","date":"2 ноября 2026","title":"Готовность зала","groups":[{"title":"Страница техника","items":["Под названием зала видно, сколько пунктов осталось отметить в каждом отделе. После последнего пункта появляется кнопка подтверждения."]}]},
   {"version":"28.5.1","date":"2 ноября 2026","title":"Готовность зала","groups":[{"title":"Для техника","items":["Кнопка «Зал готов» появляется, когда выполнены все пункты зала во всех отделах."]}]},
@@ -424,9 +425,35 @@ function loadTech(id){
 }
 /* ---------- shared "done" checks ---------- */
 var checks={},checksFor=null,checksKey="",pendingCheck=null,checkRequest=0,checkPending={};
+function paintChecks(id){
+ var ev=evById(id);
+ if(!ev||editing||modal||route()!==id)return;
+ if(!document.querySelector(".hall")){render();return}
+ var template=document.createElement("template");
+ template.innerHTML=hallsView(ev,false,deptsFor(id));
+ var current=new Map(Array.from(app.querySelectorAll("input[data-done]"),function(node){return [node.dataset.done,node]}));
+ template.content.querySelectorAll("input[data-done]").forEach(function(next){
+  var input=current.get(next.dataset.done);if(!input)return;
+  var row=input.closest("label"),fresh=next.closest("label");
+  input.checked=next.checked;row.classList.toggle("done",next.checked);
+  var who=row.querySelector(".who"),updated=fresh.querySelector(".who");
+  if(updated&&!who)(row.querySelector(".ss-b")||row).appendChild(updated.cloneNode(true));
+  else if(who&&!updated)who.remove();
+  else if(who&&who.textContent!==updated.textContent)who.textContent=updated.textContent;
+ });
+ var counters=new Map(Array.from(app.querySelectorAll(".cat-toggle"),function(node){return [node.dataset.k,node.querySelector(".n")]}));
+ template.content.querySelectorAll(".cat-toggle").forEach(function(next){
+  var n=counters.get(next.dataset.k),value=next.querySelector(".n").innerHTML;
+  if(n&&n.innerHTML!==value)n.innerHTML=value;
+ });
+ template.content.querySelectorAll(".hall").forEach(function(next){
+  var hall=document.getElementById(next.id),old=hall&&hall.querySelector(".hall-progress"),fresh=next.querySelector(".hall-progress");
+  if(old&&fresh&&old.innerHTML!==fresh.innerHTML)old.innerHTML=fresh.innerHTML;
+ });
+}
 function loadChecks(id){if(!id)return Promise.resolve();var request=++checkRequest;
  return sb.rpc("get_checks",{p_id:id}).then(function(r){if(r.error||route()!==id||request!==checkRequest||Object.keys(checkPending).length)return;var m={};(r.data||[]).forEach(function(x){m[x.item_id]={by:x.by_name||"",at:x.at}});
-  var k=JSON.stringify(m);checksFor=id;if(k!==checksKey){checksKey=k;checks=m;if(!editing&&!modal)render()}})}
+  var k=JSON.stringify(m);checksFor=id;if(k!==checksKey){checksKey=k;checks=m;if(!editing&&!modal)paintChecks(id)}})}
 var meMem="";
 function getCookie(n){var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)"));try{return m?decodeURIComponent(m[1]):""}catch(e){return ""}}
 function saveMe(nm){meMem=nm;ls.set("tz-me",nm);try{sessionStorage.setItem("tz-me",nm)}catch(e){}try{document.cookie="tz-me="+encodeURIComponent(nm)+"; path=/; max-age=31536000; SameSite=Lax"}catch(e){}}
@@ -435,16 +462,16 @@ function myName(){return isAdmin?(storedMe()||myEmail().split("@")[0]):storedMe(
 function shortName(n){var p=String(n||"").trim().split(/\s+/);var f=p[0]?p[0].charAt(0).toUpperCase()+p[0].slice(1):"";return p.length>1?f+" "+p[1].charAt(0).toUpperCase()+".":f}
 function fmtWhen(at){var d=new Date(at);if(isNaN(d))return "";var t=d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});var today=new Date();return d.toDateString()===today.toDateString()?t:d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" "+t}
 function setCheck(evid,item,done){
- var key=evid+"|"+item;if(checkPending[key]){render();return}
+ var key=evid+"|"+item;if(checkPending[key]){paintChecks(evid);return}
  var name=myName();if(done&&!name)return;
  checkPending[key]=true;++checkRequest;
- var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";render();
+ var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";paintChecks(evid);
  sb.rpc("set_check",{p_event:evid,p_item:item,p_done:done,p_by:name}).then(function(r){
   delete checkPending[key];
   if(route()!==evid)return;
-  if(r.error){if(prev)checks[item]=prev;else delete checks[item];render();toast("Не удалось сохранить отметку: "+r.error.message);return}
-  if(checks[item])delete checks[item].pending;if(!editing&&!modal)render();loadChecks(evid);
- },function(){delete checkPending[key];if(route()!==evid)return;if(prev)checks[item]=prev;else delete checks[item];render();toast("Не удалось сохранить отметку: ошибка сети")});
+  if(r.error){if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid);toast("Не удалось сохранить отметку: "+r.error.message);return}
+  if(checks[item])delete checks[item].pending;if(!editing&&!modal)paintChecks(evid);loadChecks(evid);
+ },function(){delete checkPending[key];if(route()!==evid)return;if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid);toast("Не удалось сохранить отметку: ошибка сети")});
 }
 setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
 var reloadT;
@@ -830,7 +857,7 @@ function hallsView(ev,isEdit,depts){
   var tot2=cats.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
   var hch=cats.some(function(c){return markCount(ev,h.id+"|"+c.id)});
   return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hallRole(ev,h.id)?'<span class="hall-role">'+esc(hallRole(ev,h.id))+'</span>':'')+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
-   (hc?'':readyButton(ev,h)+'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
+   (hc?'':(isAdmin?'':'<div class="hall-progress">'+readyButton(ev,h)+'</div>')+'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
  }).join("")+(isEdit?'':'<p class="hint me-line">Отметки «сделано» видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
 }
 function chiefRead(b,k){if(!hasChief(b))return "";var m=curMarks["chief|"+k];

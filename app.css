@@ -450,3 +450,8 @@ h4 .req-n{vertical-align:2px}
 .hall-h{border-bottom:2px solid var(--ink)}
 .card h3,.row .nm,.stage-spec .ss b,.person .p-name{font-weight:500}
 .row .q,.card-date .d,.frow dd.m{font-variant-numeric:tabular-nums}
+
+/* Keep the attribution line in the layout before the first check. */
+.row:not(:has(.who))::after,.ss-chk:not(:has(.who)) .ss-b::after{content:"";display:block;min-height:1.45em;font-size:12px}
+.row:not(:has(.who))::after{grid-column:2/4}
+.hall-progress:not(:empty){min-height:48px;display:flow-root}
