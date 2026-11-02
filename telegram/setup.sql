@@ -7,7 +7,6 @@ create table if not exists tz_telegram.subs (event text references public.events
 create table if not exists tz_telegram.ready (event text references public.events(id) on delete cascade, hall text, technician text not null, primary key(event,hall));
 create table if not exists tz_telegram.outbox (id bigint generated always as identity primary key, chat bigint not null, event text references public.events(id) on delete cascade, kind text not null, message text not null, due timestamptz not null default now(), attempts int not null default 0);
 create index if not exists tg_delivery on tz_telegram.outbox(due,id);
-create table if not exists tz_telegram.cursor_state (id boolean primary key check(id), next_update bigint not null);
 create or replace function public.tg_event_info(p_event text) returns jsonb language sql stable security definer set search_path='' as $$
  select jsonb_build_object('username',b.username,'ready',coalesce((select jsonb_object_agg(r.hall,r.technician) from tz_telegram.ready r where r.event=e.id),'{}'::jsonb))
  from tz_telegram.bot b join public.events e on e.id=p_event
@@ -71,15 +70,56 @@ drop trigger if exists tz_telegram_change on public.events;
 create trigger tz_telegram_change after update on public.events for each row when (old.data is distinct from new.data) execute function tz_telegram.on_change();
 revoke all on function public.tg_event_info(text),public.tg_hall_ready(text,text,text) from public;
 grant execute on function public.tg_event_info(text),public.tg_hall_ready(text,text,text) to anon,authenticated;
--- Dedicated worker role. Set a login password outside this file.
-do $$ begin if not exists(select from pg_roles where rolname='tz_bot_worker') then create role tz_bot_worker login; end if; end $$;
-grant usage on schema tz_telegram to tz_bot_worker;
-grant select,insert,update,delete on all tables in schema tz_telegram to tz_bot_worker;
-grant usage,select on all sequences in schema tz_telegram to tz_bot_worker;
-create or replace function tz_telegram.active_title(eid text) returns text language sql stable security definer set search_path='' as $$
- select coalesce(nullif(data->>'title',''),'Мероприятие') from public.events where id=eid and coalesce(data->>'deletedAt','')='' and coalesce(data->>'status','')<>'done'
+-- Only the Edge Function can process messages and deliver the queue.
+create table if not exists tz_telegram.updates (id bigint primary key, received timestamptz default now());
+alter table tz_telegram.outbox add column if not exists lease uuid;
+create or replace function public.tg_command(p_update bigint,p_chat bigint,p_command text,p_arg text,p_admin boolean)
+returns void language plpgsql security definer set search_path='' as $$
+declare title text; reply text;
+begin
+ insert into tz_telegram.updates(id) values(p_update) on conflict do nothing;
+ if not found then return; end if;
+ if p_command='/stop' then
+  delete from tz_telegram.admin_chats where chat=p_chat;
+  delete from tz_telegram.subs where chat=p_chat;
+  delete from tz_telegram.outbox where chat=p_chat;
+  reply:='Уведомления отключены.';
+ elsif p_command='/id' then reply:='Ваш номер чата: '||p_chat;
+ elsif p_command='/start' and p_arg ~ '^[A-Za-z0-9_-]{1,64}$' then
+  select coalesce(data->>'title','Мероприятие') into title from public.events where id=p_arg and coalesce(data->>'deletedAt','')='' and coalesce(data->>'status','')<>'done' for share;
+  if found then
+   insert into tz_telegram.subs values(p_arg,p_chat) on conflict do nothing;
+   reply:='Вы подписаны на ТЗ «'||left(title,180)||'». Отключить уведомления — /stop.';
+  else reply:='ТЗ недоступно.'; end if;
+ elsif p_command='/start' and p_admin and p_arg='' then
+  insert into tz_telegram.admin_chats values(p_chat) on conflict do nothing;
+  reply:='Сообщения о готовности залов включены.';
+ else reply:='Для подписки откройте ссылку из нужного ТЗ. Чтобы узнать номер чата, отправьте /id.'; end if;
+ insert into tz_telegram.outbox(chat,kind,message) values(p_chat,'reply',reply);
+end $$;
+create or replace function public.tg_tick(p_username text,p_admins bigint[]) returns void language plpgsql security definer set search_path='' as $$
+begin
+ delete from tz_telegram.updates where received<now()-interval '7 days';
+ delete from tz_telegram.admin_chats where not(chat=any(p_admins));
+ delete from tz_telegram.outbox where kind='ready' and not(chat=any(p_admins));
+ insert into tz_telegram.bot values(true,p_username,now()) on conflict(id) do update set heartbeat=now(),username=excluded.username;
+end $$;
+create or replace function public.tg_claim() returns jsonb language sql security definer set search_path='' as $$
+ with claimed as (update tz_telegram.outbox set due=now()+interval '2 minutes',lease=gen_random_uuid(),attempts=attempts+1 where id=(select id from tz_telegram.outbox where due<=now() order by id limit 1 for update skip locked) returning *) select to_jsonb(c) from claimed c
 $$;
-revoke all on function tz_telegram.active_title(text) from public;
-grant execute on function tz_telegram.active_title(text) to tz_bot_worker;
+create or replace function public.tg_finish(p_id bigint,p_lease uuid,p_code integer,p_retry integer) returns void language plpgsql security definer set search_path='' as $$
+declare cid bigint;
+begin
+ select chat into cid from tz_telegram.outbox where id=p_id and lease=p_lease for update;
+ if not found then return; end if;
+ if p_code=403 then
+  delete from tz_telegram.subs where chat=cid;
+  delete from tz_telegram.admin_chats where chat=cid;
+  delete from tz_telegram.outbox where chat=cid;
+ elsif p_code in (200,400) then delete from tz_telegram.outbox where id=p_id;
+ else update tz_telegram.outbox set due=now()+make_interval(secs=>greatest(1,p_retry)),lease=null where id=p_id; end if;
+end $$;
+revoke all on function public.tg_command(bigint,bigint,text,text,boolean), public.tg_tick(text,bigint[]),public.tg_claim(),public.tg_finish(bigint,uuid,int,int) from public,anon,authenticated;
+grant execute on function public.tg_command(bigint,bigint,text,text,boolean), public.tg_tick(text,bigint[]),public.tg_claim(),public.tg_finish(bigint,uuid,int,int) to service_role;
 notify pgrst,'reload schema';
 commit;
