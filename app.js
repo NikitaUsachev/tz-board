@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.6.3","date":"2 ноября 2026","title":"Отметки без смещения списка","groups":[{"title":"Страница техника","items":["Подпись исполнителя занимает постоянную строку. При обновлении отметок открытая позиция сохраняет своё место на экране."]}]},
 {"version":"28.6.2","date":"2 ноября 2026","title":"Список оборудования","groups":[{"title":"На странице ТЗ","items":["Между соседними позициями оборудования добавлен отступ, чтобы примечания и отметки было проще читать."]}]},
 {"version":"28.6.1","date":"2 ноября 2026","title":"Отметки выполнения","groups":[{"title":"Страница техника","items":["При отметке задачи список обновляется на месте, сохраняя положение строки."]}]},
   {"version":"28.6","date":"2 ноября 2026","title":"Новое оформление доски и ТЗ","groups":[{"title":"Чтение","items":["Названия мероприятий, залов и оборудования получили более лёгкое начертание. Прямые линии разделяют залы и рабочие блоки."]}]},
@@ -426,17 +427,21 @@ function loadTech(id){
 }
 /* ---------- shared "done" checks ---------- */
 var checks={},checksFor=null,checksKey="",pendingCheck=null,checkRequest=0,checkPending={};
-function paintChecks(id){
+function paintChecks(id,task){
  var ev=evById(id);
  if(!ev||editing||modal||route()!==id)return;
  if(!document.querySelector(".hall")){render();return}
+ var visibleInputs=Array.from(app.querySelectorAll("input[data-done]"));
+ var visible=function(node){var box=node.getBoundingClientRect();return box.top>=0&&box.bottom<=window.innerHeight};
+ var anchor=visibleInputs.find(function(node){return node.dataset.done===id+"|"+task&&visible(node)})||visibleInputs.find(visible);
+ var top=anchor&&anchor.getBoundingClientRect().top;
  var template=document.createElement("template");
  template.innerHTML=hallsView(ev,false,deptsFor(id));
  var current=new Map(Array.from(app.querySelectorAll("input[data-done]"),function(node){return [node.dataset.done,node]}));
  template.content.querySelectorAll("input[data-done]").forEach(function(next){
   var input=current.get(next.dataset.done);if(!input)return;
   var row=input.closest("label"),fresh=next.closest("label");
-  input.checked=next.checked;row.classList.toggle("done",next.checked);
+  if(input.checked!==next.checked)input.checked=next.checked;row.classList.toggle("done",next.checked);
   var who=row.querySelector(".who"),updated=fresh.querySelector(".who");
   if(updated&&!who)(row.querySelector(".ss-b")||row).appendChild(updated.cloneNode(true));
   else if(who&&!updated)who.remove();
@@ -451,6 +456,7 @@ function paintChecks(id){
   var hall=document.getElementById(next.id),old=hall&&hall.querySelector(".hall-progress"),fresh=next.querySelector(".hall-progress");
   if(old&&fresh&&old.innerHTML!==fresh.innerHTML)old.innerHTML=fresh.innerHTML;
  });
+ if(anchor){var shift=anchor.getBoundingClientRect().top-top;if(Math.abs(shift)>=1)window.scrollBy(0,shift)}
 }
 function loadChecks(id){if(!id)return Promise.resolve();var request=++checkRequest;
  return sb.rpc("get_checks",{p_id:id}).then(function(r){if(r.error||route()!==id||request!==checkRequest||Object.keys(checkPending).length)return;var m={};(r.data||[]).forEach(function(x){m[x.item_id]={by:x.by_name||"",at:x.at}});
@@ -463,16 +469,16 @@ function myName(){return isAdmin?(storedMe()||myEmail().split("@")[0]):storedMe(
 function shortName(n){var p=String(n||"").trim().split(/\s+/);var f=p[0]?p[0].charAt(0).toUpperCase()+p[0].slice(1):"";return p.length>1?f+" "+p[1].charAt(0).toUpperCase()+".":f}
 function fmtWhen(at){var d=new Date(at);if(isNaN(d))return "";var t=d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});var today=new Date();return d.toDateString()===today.toDateString()?t:d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" "+t}
 function setCheck(evid,item,done){
- var key=evid+"|"+item;if(checkPending[key]){paintChecks(evid);return}
+ var key=evid+"|"+item;if(checkPending[key]){paintChecks(evid,item);return}
  var name=myName();if(done&&!name)return;
  checkPending[key]=true;++checkRequest;
- var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";paintChecks(evid);
+ var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";paintChecks(evid,item);
  sb.rpc("set_check",{p_event:evid,p_item:item,p_done:done,p_by:name}).then(function(r){
   delete checkPending[key];
   if(route()!==evid)return;
-  if(r.error){if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid);toast("Не удалось сохранить отметку: "+r.error.message);return}
-  if(checks[item])delete checks[item].pending;if(!editing&&!modal)paintChecks(evid);loadChecks(evid);
- },function(){delete checkPending[key];if(route()!==evid)return;if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid);toast("Не удалось сохранить отметку: ошибка сети")});
+  if(r.error){if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid,item);toast("Не удалось сохранить отметку: "+r.error.message);return}
+  if(checks[item])delete checks[item].pending;if(!editing&&!modal)paintChecks(evid,item);loadChecks(evid);
+ },function(){delete checkPending[key];if(route()!==evid)return;if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid,item);toast("Не удалось сохранить отметку: ошибка сети")});
 }
 setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
 var reloadT;
@@ -869,7 +875,7 @@ function staffRead(b){var st=staffOf(b);if(!st.length)return "";
 function specTasks(b){var sp=b&&b.spec;if(!sp||!sp.id)return [];return specLines(sp).map(function(x){return sp.id+":"+x[2]})}
 function stageRead(b,k,evid){var L=specLines(b.spec);if(!L.length)return "";var m=curMarks["spec|"+k],sid=b.spec.id;
  return '<div class="stage-spec'+(m?" mk-changed":"")+'">'+L.map(function(x){var tid=sid?sid+":"+x[2]:"",c=tid&&checks[tid];
-  var inner='<span class="eyebrow">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b>'+(c?'<span class="who">✓ '+esc(shortName(c.by)||"отмечено")+(c.at?' · '+esc(fmtWhen(c.at)):'')+'</span>':'');
+  var inner='<span class="eyebrow">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b>'+(c?'<span class="who">✓ '+esc(shortName(c.by)||"отмечено")+(c.at?' · '+esc(fmtWhen(c.at)):'')+'</span>':'<span class="who"></span>');
   return tid?'<label class="ss ss-chk'+(c?" done":"")+'"><input type="checkbox" data-done="'+esc(evid)+'|'+esc(tid)+'"'+(c?" checked":"")+'><span class="ss-b">'+inner+'</span></label>':'<div class="ss">'+inner+'</div>'}).join("")+'</div>'}
 function catRead(ev,hid,c,done,col){
  col=col||{};var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
@@ -879,7 +885,7 @@ function catRead(ev,hid,c,done,col){
  var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stageRead(b,k,ev.id):"";
  if(!items.length&&!plots&&!spec&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
-  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'')+'</label>'}).join("")+'</div>':'')+staff+
+  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'<span class="who"></span>')+'</label>'}).join("")+'</div>':'')+staff+
   ((b.note||"").trim()?'<p class="cat-note'+(curMarks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
 }
 function staffEdit(hid,c,b){var st=b.staff||[],at=function(i){return ' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"'};

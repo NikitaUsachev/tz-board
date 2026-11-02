@@ -452,6 +452,5 @@ h4 .req-n{vertical-align:2px}
 .row .q,.card-date .d,.frow dd.m{font-variant-numeric:tabular-nums}
 
 /* Keep the attribution line in the layout before the first check. */
-.row:not(:has(.who))::after,.ss-chk:not(:has(.who)) .ss-b::after{content:"";display:block;min-height:1.45em;font-size:12px}
-.row:not(:has(.who))::after{grid-column:2/4}
+.row .who,.ss-chk .who{display:block;height:18px;line-height:18px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hall-progress:not(:empty){min-height:48px;display:flow-root}
