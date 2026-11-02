@@ -5,10 +5,10 @@
   --accent:#2747C4; --accent-ink:#FFFFFF; --accent-soft:#E3E8FA;
   --sound:#0B8577; --light:#B87203; --video:#7446CC;
   --danger:#C03838; --ok:#2C8452; --warn:#B87203;
-  --f-display:"Unbounded","Onest",system-ui,sans-serif;
-  --f-body:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-display:var(--f-body);
+  --f-body:"Helvetica Neue",Helvetica,Arial,sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
-  --r:10px;
+  --r:2px;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
@@ -439,3 +439,14 @@ h4 .req-n{vertical-align:2px}
 .version-link.has-update{background:#F5B83D;color:#141B26;font-weight:600;box-shadow:0 0 0 1px rgba(20,27,38,.12)}
 .version-link.has-update:hover{background:#FFD47A;color:#141B26}
 .version-new{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:99px;background:#141B26;color:#FFF;font-size:10px;line-height:1.6;vertical-align:1px}
+
+/* Геометрия доски и рабочего листа. Цвет категории сохраняет своё значение. */
+.brand h1,.auth-brand h1,.head h2,.hall-h h3,.card h3,.dlg h2,.col-h h2,.cat-h b{font-family:var(--f-display);font-weight:500;letter-spacing:-.025em}
+.head h2{line-height:1.14}
+.hall-h h3{font-size:clamp(22px,3vw,32px)}
+.col,.head,.cat,.card,.dlg,.auth-card,.btn,.add-col,.search,.chip,.hall-chip,.hall-role,.pill,.mode,.seg,.seg button,.fact,.version-link,.stage-spec .ss{border-radius:2px}
+.head{border-top:3px solid var(--ink)}
+.col-h{border-bottom:1px solid var(--line)}
+.hall-h{border-bottom:2px solid var(--ink)}
+.card h3,.row .nm,.stage-spec .ss b,.person .p-name{font-weight:500}
+.row .q,.card-date .d,.frow dd.m{font-variant-numeric:tabular-nums}
