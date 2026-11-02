@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+  {"version":"28.5.1","date":"2 ноября 2026","title":"Готовность зала","groups":[{"title":"Для техника","items":["Кнопка «Зал готов» появляется, когда выполнены все пункты зала во всех отделах."]}]},
   {
   "version": "28.5",
   "date": "2 ноября 2026",
@@ -363,15 +364,26 @@ function telegramLink(ev){
  if(isAdmin||telegramEvent?.id!==ev.id||!/^[A-Za-z0-9_-]{1,64}$/.test(ev.id))return "";
  return '<p><a class="btn" target="_blank" rel="noopener noreferrer" href="https://t.me/'+telegramEvent.username+'?start='+encodeURIComponent(ev.id)+'">Получать изменения в Telegram</a></p>';
 }
+function hallTasksDone(ev,hall){
+ var blocks=ev&&ev.blocks&&ev.blocks[hall];
+ if(!blocks||checksFor!==ev.id)return false;
+ var ids=CATS.flatMap(function(category){
+  var block=blocks[category.id];
+  if(!block)return [];
+  var items=(block.items||[]).filter(function(item){return (item.name||"").trim()}).map(function(item){return item.id});
+  return category.id==="stage"?items.concat(specTasks(block)):items;
+ });
+ return ids.length>0 && ids.every(function(id){return id&&checks[id]&&!checks[id].pending});
+}
 function readyButton(ev,h){
- if(isAdmin||!window.TZ_CONFIG.telegram||ev.status==="done")return "";
+ if(isAdmin||!window.TZ_CONFIG.telegram||ev.status==="done"||!hallTasksDone(ev,h.id))return "";
  var name=telegramEvent?.id===ev.id && telegramEvent.ready[h.id];
  if(typeof name==="string")return '<p class="hint">Готов к прогонам · '+esc(name)+'</p>';
  return '<button class="btn" data-act="tg-ready" data-h="'+esc(h.id)+'">Зал готов</button>';
 }
 function sendHallReady(button,hall){
  var id=route(),name=storedMe();
- if(isAdmin||!window.TZ_CONFIG.telegram||!id)return;
+ if(isAdmin||!window.TZ_CONFIG.telegram||!id||!hallTasksDone(evById(id),hall))return;
  if(!name||!Object.values(checks).some(function(check){return check.by===name})){toast("Сначала отметьте выполненный пункт в этом ТЗ");return}
  button.disabled=true;
  sb.rpc("tg_hall_ready",{p_event:id,p_hall:hall,p_name:name}).then(function(r){

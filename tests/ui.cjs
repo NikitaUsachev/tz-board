@@ -2,12 +2,12 @@
 const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
 const tick=()=>new Promise(setImmediate);
-async function boot(admin,deleted=false,telegram=false){
+async function boot(admin,deleted=false,telegram=false,done=[]){
  const listeners={},winListeners={},store=new Map();let html='';
  const app={classList:{toggle(){}},addEventListener:(n,f)=>(listeners[n]??=[]).push(f),get innerHTML(){return html},set innerHTML(v){html=v}};
  const ev={id:'E',title:'Known event',date:'2026-12-01',halls:['h'],status:'prep',blocks:{h:{sound:{items:[{id:'item',name:'Microphone',qty:'2'}],note:''}}}};if(deleted)ev.deletedAt='2026-11-01';
  const rows=[{id:'E',data:ev,version:1,updated_at:'2026-11-01T00:00:00Z'}];
- const sb={auth:{getSession:async()=>({data:{session:admin?{user:{id:'user',email:'admin@example.com'}}:null}}),onAuthStateChange(){}},rpc:async(name)=>({data:name==='is_admin'?true:name==='get_event_v2'?rows:name==='tg_event_info'?{username:'example_tz_bot',ready:{}}:[]}),from(table){return new class{
+ const sb={auth:{getSession:async()=>({data:{session:admin?{user:{id:'user',email:'admin@example.com'}}:null}}),onAuthStateChange(){}},rpc:async(name)=>({data:name==='is_admin'?true:name==='get_event_v2'?rows:name==='get_checks'?done:name==='tg_event_info'?{username:'example_tz_bot',ready:{}}:[]}),from(table){return new class{
   constructor(){this.filters=[];this.op='read';this.single=false}
   select(){return this}eq(k,v){this.filters.push([k,v]);return this}neq(){return this}order(){return this}maybeSingle(){this.single=true;return this}insert(p){this.op='insert';this.p=p;return this}
   then(a,b){return Promise.resolve().then(()=>{let data=table==='events'?rows:table==='settings'?[{id:1,data:{halls:[{id:'h',name:'Main'}]},updated_at:'stamp'}]:[{email:'admin@example.com'}];if(this.op==='insert'){const r={...this.p,version:1,updated_at:'2026-11-01T00:00:00Z'};rows.push(r);data=[r]}else data=data.filter(r=>this.filters.every(([k,v])=>r[k]===v));return {data:this.single?(data[0]||null):JSON.parse(JSON.stringify(data))}}).then(a,b)}
@@ -34,8 +34,8 @@ async function boot(admin,deleted=false,telegram=false){
  const t=await boot(false);assert.ok(!t.app.innerHTML.includes('Несохранённые изменения'));assert.ok(!t.app.innerHTML.includes('Корзина'));assert.ok(!t.app.innerHTML.includes('Зарегистрироваться'));assert.match(t.app.innerHTML,/Known event/);
  for(const f of t.listeners.change)f({target:{dataset:{done:'E|item'},checked:true}});assert.match(t.app.innerHTML,/Как вас зовут/);
  assert.doesNotMatch(t.app.innerHTML,/Получать изменения в Telegram/);
- const tg=await boot(false,false,true);assert.match(tg.app.innerHTML,/example_tz_bot\?start=E/);assert.match(tg.app.innerHTML,/Зал готов/);
- tg.click('tg-ready',{h:'h'});assert.match(tg.c.document.getElementById('toast').textContent,/Сначала отметьте/);
+ const tg=await boot(false,false,true);assert.match(tg.app.innerHTML,/example_tz_bot\?start=E/);assert.doesNotMatch(tg.app.innerHTML,/Зал готов/);
+ const completed=await boot(false,false,true,[{item_id:'item',by_name:'Имя'}]);assert.match(completed.app.innerHTML,/Зал готов/);
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);
  console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, first-check name prompt, hidden trash events');
 })().catch(e=>{console.error(e);process.exitCode=1});
