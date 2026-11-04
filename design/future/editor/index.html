@@ -1,0 +1,33 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Световой лист · Редактор ТЗ</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f6f2;color:#191c1d;font:16px/1.4 "Helvetica Neue",Helvetica,Arial,sans-serif}main{max-width:1050px;margin:auto;padding:20px clamp(16px,4vw,48px) 50px}nav,footer,.sectionhead,.line,.fieldrow{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}nav{border-bottom:1px solid #abb1b3;padding-bottom:14px}a{color:inherit}small,.num,.k{font:12px/1.45 ui-monospace,monospace;letter-spacing:.045em}.hero{margin-top:20px;padding:clamp(20px,4vw,40px);background:#b5dafa;color:#142433}.hero h1{font-size:clamp(38px,6vw,70px);font-weight:300;letter-spacing:-.06em;line-height:1;margin:20px 0}.hero p{margin:0}.cue{background:#ff955f;padding:5px 9px;color:#262019}.fieldrow{justify-content:start;margin-top:18px}.sectionhead{border-top:1px solid #adb4b3;padding-top:14px;margin-top:24px}.sectionhead h2{font-size:24px;font-weight:400;letter-spacing:-.03em;margin:0}.sectionhead .k{color:#48545b}.fields{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin:14px 0}label{display:block;font-size:14px}input,textarea,select,button,summary{font:inherit;color:inherit}input:not([type=checkbox]),select,textarea{display:block;width:100%;margin-top:5px;padding:9px 10px;background:white;border:1px solid #afb6b5;border-radius:3px;min-width:0}textarea{resize:vertical}button,summary{cursor:pointer;padding:8px 12px;border:1px solid #afb6b5;background:white;border-radius:3px}summary{width:fit-content}.rooms{margin:8px 0;max-height:135px;overflow:auto;background:white;scrollbar-gutter:stable;border:1px solid #bcc2c2;width:min(320px,100%)}.rooms label{padding:8px 10px}.rooms input{accent-color:#193a51}.items{margin-top:14px}.row{display:grid;grid-template-columns:minmax(135px,1.2fr) 75px minmax(145px,1fr);gap:14px;border-top:1px solid #c6c9c6;padding:12px 0}.note{color:#475558;font-size:14px}.primary{background:#1c303a;color:white;border-color:#1c303a}footer{margin-top:22px;padding-top:15px;border-top:1px solid #abb1b3}button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #24688c;outline-offset:2px}@media(max-width:580px){.fields{grid-template-columns:1fr}.row{grid-template-columns:1fr 68px}.row label:last-child{grid-column:1/-1}.sectionhead{gap:8px}.hero .fieldrow{gap:10px}}
+</style>
+<main><nav><small>ТЗ ДОСКА / СВЕТОВОЙ ЛИСТ</small><a href="../#light/board">К сравнению макетов ↗</a></nav>
+<header class="hero"><small>ТЕХНИЧЕСКОЕ ЗАДАНИЕ / 011</small><h1 id="headline">Конференция</h1><p>Редактор администратора · Демонстрационное ТЗ</p><div class="fieldrow"><span>Монтаж <b>09:00</b></span><span class="cue">Прогоны <b>14:30</b></span><span>Старт <b>18:00</b></span></div></header>
+<form id="form"><div class="sectionhead"><h2>Мероприятие</h2><span class="k">01 / ШАПКА</span></div><div class="fields"><label>Название мероприятия<input id="title" value="Конференция" required></label><label>Дата мероприятия<input id="date" type="date" value="2026-11-04" required></label></div>
+<details><summary>Выбрать залы</summary><div class="rooms" id="rooms"></div></details><p class="note" id="selected"></p>
+<div class="sectionhead"><h2>Оборудование</h2><span class="k">02 / ВЕДОМОСТЬ</span></div>
+<div class="fields"><label>Рабочий зал<select id="hall"></select></label><label>Отдел<select id="dept"><option>Видео</option><option>Свет</option><option>Звук</option></select></label></div>
+<div class="items" id="items"></div><button type="button" id="add">+ Добавить позицию</button>
+<footer><span class="note" id="status" role="status">Данные макета доступны в этой вкладке.</span><button class="primary">Сохранить макет</button></footer></form></main>
+<script>
+const $=id=>document.getElementById(id);
+const names=['Brook Hall','Welcome Hall','Main Hall'];
+const initial={title:'Конференция',date:'2026-11-04',rooms:['Brook Hall'],lists:{'Brook Hall':{'Видео':[['Суфлёр',2,'На сцене, перед первым рядом'],['Экран 4,5 × 2,5 м',1,'Собираем на тотемах'],['ТВ 65″ на стойке',1,'Справа от сцены, вход HDMI']],'Свет':[['LED Bar',6,'Вдоль задника']],'Звук':[['Радиомикрофон',2,'Для ведущих']]}}};
+const key='tz-design-light-editor-v1';let draft=initial;try{draft=JSON.parse(sessionStorage.getItem(key))||initial}catch{}
+$('title').value=draft.title;$('headline').textContent=draft.title;$('date').value=draft.date;
+function rows(){const room=draft.lists[$('hall').value]??={};return room[$('dept').value]??=[]}
+function drawItems(){
+ const hasHall=Boolean($('hall').value);$('add').disabled=!hasHall;$('dept').disabled=!hasHall;$('items').replaceChildren();
+ if(!hasHall){$('items').textContent='Выберите зал в шапке.';return}
+ for(const item of rows()){
+ const line=document.createElement('div');line.className='row';
+ ['Позиция','Кол-во, шт.','Монтажное примечание'].forEach((caption,i)=>{const label=document.createElement('label'),input=document.createElement('input');label.textContent=caption;input.value=item[i];if(i===1){input.type='number';input.min=1}if(i<2)input.required=true;input.oninput=()=>{item[i]=input.value};label.append(input);line.append(label)});$('items').append(line)}
+}
+function showRooms(){const current=$('hall').value;$('hall').replaceChildren(...draft.rooms.map(n=>new Option(n,n)));if(draft.rooms.includes(current))$('hall').value=current;$('selected').textContent='Назначенные залы · '+(draft.rooms.join(' / ')||'пока не выбраны');drawItems()}
+for(const name of names){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=draft.rooms.includes(name);input.onchange=()=>{draft.rooms=names.filter(n=>n===name?input.checked:draft.rooms.includes(n));showRooms()};label.append(input,' '+name);$('rooms').append(label)}
+showRooms();$('hall').onchange=$('dept').onchange=drawItems;$('title').oninput=e=>{$('headline').textContent=e.target.value||'Название мероприятия';draft.title=e.target.value};$('date').oninput=e=>draft.date=e.target.value;
+function dirty(){$('status').textContent='Есть изменения в макете.'}
+$('form').oninput=dirty;$('add').onclick=()=>{rows().push(['',1,'']);drawItems();$('items').lastChild.querySelector('input').focus();dirty()};
+$('form').onsubmit=e=>{e.preventDefault();try{sessionStorage.setItem(key,JSON.stringify(draft));$('status').textContent='Макет сохранён в этой вкладке.'}catch{$('status').textContent='Сохранение недоступно в этом браузере.'}};
+</script></html>
