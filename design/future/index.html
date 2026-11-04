@@ -6,13 +6,13 @@ main{width:min(1140px,100%);margin:auto;padding:24px clamp(16px,4vw,50px) 64px}n
 @media(max-width:650px){main{padding-top:14px}nav{margin-bottom:18px}.boardrow{grid-template-columns:60px 1fr;gap:5px 12px}.boardrow .status{grid-column:2}.boardrow .hall{grid-column:2}.mast{gap:8px}.qty{font-size:13px}}
 </style>
 <main><nav aria-label="Сравнение макетов"><span class="micro">ТЗ ДОСКА / ДИЗАЙН-ЭТЮДЫ</span><div class="tabs" id="themes"><button data-key="light">01 Световой лист</button><button data-key="contour">02 Контур</button><button data-key="time">03 Таймкод</button></div></nav>
-<div class="mast"><span class="brand">ТЗ / Мероприятия</span><div class="tabs" id="roles"><button data-key="board">Доска администратора</button><button data-key="tech">Лист техника</button></div></div><div id="screen"></div><div class="foot">Демонстрационное ТЗ · Отметки действуют только в этом макете.</div></main>
+<div class="mast"><span class="brand">ТЗ / Мероприятия</span><div class="tabs" id="roles"><button data-key="board">Доска администратора</button><button data-key="tech">Лист техника</button></div></div><p id="editorLink"><a href="editor/" style="color:inherit">Открыть редактор ТЗ · Световой лист ↗</a></p><div id="screen"></div><div class="foot">Демонстрационное ТЗ · Отметки действуют только в этом макете.</div></main>
 <script>
 const screenEl=document.querySelector('#screen'),tasks=[['Суфлёр','На сцене, перед первым рядом','2 шт.'],['Экран 4,5 × 2,5 м','Собираем на тотемах','1 шт.'],['ТВ 65″ на стойке','Справа от сцены, вход HDMI','1 шт.']],done=[true,false,false];
 const times='<div class="schedule"><span>Монтаж <time>09:00</time></span><span class="cue">Прогоны <time>14:30</time></span><span>Старт <time>18:00</time></span></div>';
 function render(){
  let [theme,role]=location.hash.slice(1).split('/');if(!['light','contour','time'].includes(theme))theme='light';if(role!=='tech')role='board';
- document.body.dataset.theme=theme;
+ document.body.dataset.theme=theme;document.querySelector('#editorLink').hidden=theme!=='light';
  for(const [group,key] of [['themes',theme],['roles',role]])document.querySelectorAll('#'+group+' button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.key===key));
  const tech=role==='tech',scheduleFirst=theme==='time';
  const hero='<header class="hero"><span class="micro">'+(tech?'ТЕХНИЧЕСКОЕ ЗАДАНИЕ / 011':'СРЕДА / 04 НОЯБРЯ 2026')+'</span>'+(scheduleFirst?times:'')+'<h1>'+(tech?'Brook Hall':scheduleFirst?'09:00 — 18:00':'Доска мероприятий')+'</h1><p>'+(tech?'Конференция · 4 ноября':'Монтажная смена · 3 мероприятия')+'</p>'+(!scheduleFirst?times:'')+'</header>';
