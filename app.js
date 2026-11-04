@@ -839,7 +839,7 @@ function factList(ev){
  rows.push(["Завершение",ev.end||"",""]);
  rows.push(["Менеджер проекта",mg,"txt"]);
  if(pa)rows.push(["Администратор проекта",pa,"txt"]);
- return '<dl class="flist">'+rows.map(function(r){return '<div class="frow'+(r[0]==="Прогоны / репетиции с"?" rehearsal":"")+'"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';
+ return '<dl class="flist">'+rows.map(function(r){return '<div class="frow'+(r[0]==="Прогоны / репетиции с"?" rehearsal":r[0]==="Начало мероприятия"?" event-start":"")+'"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';
 }
 function factCell(label,key,val,type,isEdit,extra){
  if(isEdit)return '<label class="fact"><span class="eyebrow">'+label+'</span><input id="f-'+key+'" type="'+type+'" data-f="'+key+'" value="'+esc(val||"")+'">'+(key==="rehearsal"&&editing&&editing.mountDate?'<span class="fact-act seg-mini"><button type="button" class="linkbtn'+(editing.rehearsalDay!=="mount"?" on":"")+'" data-act="reh-day" data-v="">в день мероприятия</button><button type="button" class="linkbtn'+(editing.rehearsalDay==="mount"?" on":"")+'" data-act="reh-day" data-v="mount">в монтажный день</button></span>':'')+(key==="mountDate"?'<span class="fact-act"><button type="button" class="linkbtn" data-act="mount-eve">накануне</button>'+(val?' · <button type="button" class="linkbtn" data-act="mount-clear">очистить</button>':'')+'</span>':'')+'</label>';
