@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.7.4","date":"4 ноября 2026","title":"Выбор залов на ноутбуке","groups":[{"title":"Редактирование ТЗ","items":["Длинный список залов можно прокрутить до последней галочки. После выбора список сохраняет своё положение."]}]},
 {"version":"28.7.3","date":"3 ноября 2026","title":"Отступы в профиле","groups":[{"title":"Аккаунт","items":["Поля фамилии и имени и кнопка сохранения теперь разделены отступами."]}]},
 {"version":"28.7.2","date":"3 ноября 2026","title":"Профиль администратора","groups":[{"title":"Аккаунт","items":["В личном кабинете можно сохранить фамилию и имя. Они появятся на кнопке аккаунта и будут доступны при входе с другого устройства."]}]},
 {"version":"28.7.1","date":"2 ноября 2026","title":"Единый вид ТЗ","groups":[{"title":"Просмотр","items":["Обновлены доска, настройки и редактор. Администратор и техник видят единое оформление ТЗ."]}]},
@@ -877,9 +878,24 @@ function headView(ev,isEdit){
 }
 function pickerPop(ev){
  var sel=ev.halls||[];
- return '<div class="pop" role="dialog" aria-label="Выбор залов">'+(state.halls.length?state.halls.map(function(h){return '<label><input type="checkbox" data-hallpick="'+h.id+'"'+(sel.indexOf(h.id)>=0?" checked":"")+'>'+esc(h.name)+'</label>'}).join(""):'<p class="hint" style="padding:8px">Список залов пуст</p>')+
-  '<hr><button class="btn ghost sm" data-act="settings">Изменить список залов</button><button class="btn sm primary" data-act="picker">Готово</button></div>';
+ return '<div class="pop" role="dialog" aria-label="Выбор залов"><div class="hall-options">'+(state.halls.length?state.halls.map(function(h){return '<label><input type="checkbox" data-hallpick="'+h.id+'"'+(sel.indexOf(h.id)>=0?" checked":"")+'>'+esc(h.name)+'</label>'}).join(""):'<p class="hint" style="padding:8px">Список залов пуст</p>')+
+  '</div><hr><button class="btn ghost sm" data-act="settings">Изменить список залов</button><button class="btn sm primary" data-act="picker">Готово</button></div>';
 }
+function fitHallPicker(){
+ if(!pickerOpen)return;
+ var pop=document.querySelector(".picker .pop");
+ if(!pop)return;
+ var anchor=pop.parentElement.getBoundingClientRect();
+ var topBar=document.querySelector(".top"), bottomBar=document.querySelector(".editbar");
+ var above=anchor.top-(topBar?topBar.getBoundingClientRect().bottom:0)-12;
+ var below=(bottomBar?bottomBar.getBoundingClientRect().top:window.innerHeight)-anchor.bottom-12;
+ var up=below<340&&above>below;
+ pop.classList.toggle("opens-up",up);
+ pop.style.maxHeight=Math.max(0,Math.min(340,up?above:below))+"px";
+ pop.style.left=Math.min(0,window.innerWidth-8-anchor.left-pop.offsetWidth)+"px";
+}
+window.addEventListener("resize",fitHallPicker);
+window.addEventListener("scroll",fitHallPicker);
 var HALL_ROLES=["Конференция","Пленарное заседание","Дискуссионный зал","Панельная дискуссия","Мастер-класс","Регистрация","Welcome-зона","Кофе-брейк","Банкет","Фуршет","Выставка","Пресс-зона","Бэкстейдж / гримёрка","Зона спикеров","Концерт"];
 function hallRole(ev,hid){return String(((ev&&ev.hallRoles)||{})[hid]||"").trim()}
 function hallsView(ev,isEdit,depts){
@@ -1023,6 +1039,9 @@ function setTab(t){auth.tab=t;auth.err="";auth.msg="";render();var f=document.ge
 
 /* ---------- render ---------- */
 function render(){
+ var oldOptions=pickerOpen&&document.querySelector(".hall-options");
+ var optionsTop=oldOptions?oldOptions.scrollTop:0;
+ var focusedHall=oldOptions&&oldOptions.contains(document.activeElement)?document.activeElement.dataset.hallpick:null;
  var id=route();
  var y=window.scrollY;
  var active=document.activeElement, aid=active&&active.id, sel=null;
@@ -1036,6 +1055,14 @@ function render(){
  if(editing&&dirty)persistDraft();
  app.innerHTML=body+(isAdmin&&!editing?adminFooter():"")+(isAdmin?datalists():'')+modalView();
  window.scrollTo(0,y);
+ if(pickerOpen){
+  fitHallPicker();
+  var options=document.querySelector(".hall-options");
+  if(options){
+   options.scrollTop=optionsTop;
+   if(focusedHall){var input=Array.from(options.querySelectorAll("input")).find(function(el){return el.dataset.hallpick===focusedHall});if(input)input.focus({preventScroll:true})}
+  }
+ }
  if(aid){var el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
 }
 

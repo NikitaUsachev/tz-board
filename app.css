@@ -111,6 +111,10 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 /* hall picker */
 .picker{position:relative;display:inline-block}
 .pop{position:absolute;z-index:15;top:calc(100% + 6px);left:0;min-width:240px;max-width:min(320px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 12px 32px rgba(10,20,40,.18);display:flex;flex-direction:column}
+.event-sheet .head:has(.picker .pop){overflow:visible;z-index:1}
+.pop.opens-up{top:auto;bottom:calc(100% + 6px)}
+.hall-options{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-color:var(--muted) var(--surface-2)}
+.pop>button,.pop>hr{flex:none}
 .pop label{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;cursor:pointer}
 .pop label:hover{background:var(--surface-2)}
 .pop input{width:18px;height:18px;accent-color:var(--accent)}
