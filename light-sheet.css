@@ -12,3 +12,5 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 /* Document uploads in the event editor. */
 .docs .plots-edit{border:2px solid var(--muted);background:var(--surface);border-radius:4px}
 .docs .plots-edit:focus-within{border-color:var(--accent)}
+
+.frow.event-start dd:not(.dim),.fact:has(#f-start)>.eyebrow:first-child{background:#b5dafa;color:#142433;padding:2px 7px;outline:1px solid #789bb2}
