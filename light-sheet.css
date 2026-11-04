@@ -8,3 +8,7 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 .event-sheet .head{border-radius:0;padding:clamp(20px,4vw,44px);background:var(--hero)}.event-sheet .head::after{inset:16px 16px auto auto;width:15px;height:15px;background:none;border-top:2px solid;border-right:2px solid}.event-sheet .head h2{font-weight:300;font-size:clamp(32px,5vw,64px);letter-spacing:-.05em}.head .facts,.head .flist{border-radius:0}.fact:has(#f-rehearsal)>.eyebrow:first-child,.frow.rehearsal dd:not(.dim){background:var(--cue);color:#262019;padding:2px 7px}
 .event-sheet .seg button,.btn,.pop{border-radius:4px}.hall-h{border-bottom:1px solid var(--line)}.event-sheet .cat:has(input:not([type=checkbox])){background:transparent;padding:14px 0}.event-sheet .row{border-radius:0;border-inline:0;background:transparent;box-shadow:none}.event-sheet .erow{border-radius:0}
 .auth-card,.dlg{border:1px solid var(--line);border-radius:4px;background:var(--surface)}.dlg h2,.auth-brand{border-radius:0;background:var(--hero);padding:16px}.editbar{border-top:1px solid var(--line)}
+
+/* Document uploads in the event editor. */
+.docs .plots-edit{border:2px solid var(--muted);background:var(--surface);border-radius:4px}
+.docs .plots-edit:focus-within{border-color:var(--accent)}
