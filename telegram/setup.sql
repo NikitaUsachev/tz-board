@@ -28,7 +28,7 @@ begin
  insert into tz_telegram.ready values(p_event,p_hall,n) on conflict do nothing;
  if not found then return false; end if;
  insert into tz_telegram.outbox(chat,event,kind,message)
- select chat,p_event,'ready',concat_ws(E'\n',coalesce(hall_name,p_hall)||' готов к прогонам',d->>'title',d->>'date','Подтвердил: '||n) from tz_telegram.admin_chats;
+ select chat,p_event,'ready',concat_ws(E'\n',coalesce(hall_name,p_hall)||' - задачи по ТЗ выполнены',d->>'title',d->>'date','Подтвердил: '||n) from tz_telegram.admin_chats;
  return true;
 end $$;
 create or replace function tz_telegram.on_change() returns trigger language plpgsql security definer set search_path='' as $$
