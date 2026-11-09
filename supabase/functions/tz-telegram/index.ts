@@ -55,7 +55,7 @@ async function dispatch() {
     if (!job) break;
     const params={chat_id:job.chat,text:job.message.slice(0,3800)};
     if (job.event) params.reply_markup={inline_keyboard:[[{text:"Открыть ТЗ",url:site+"#ev-"+encodeURIComponent(job.event)}]]};
-    if (!job.event) params.reply_markup={keyboard:[[{text:"Подписаться на акции"},{text:"Посмотреть акции"}],[{text:"Отписаться от акций"}]],resize_keyboard:true};
+    if (!job.event) params.reply_markup={keyboard:[[{text:"Подписаться на акции"},{text:"Посмотреть акции"}],[{text:"Отписаться от акций"}]],resize_keyboard:true,is_persistent:true,one_time_keyboard:false,input_field_placeholder:"Выберите действие кнопкой"};
     const sent=await telegram("sendMessage",params);
     const code=sent.ok?200:sent.error_code;
     if (!sent.ok) console.warn("Telegram delivery status",code);
