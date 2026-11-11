@@ -2,7 +2,7 @@
 "use strict";
 var CFG=window.TZ_CONFIG||{};
 var STATUSES=[{id:"draft",name:"Черновик"},{id:"prep",name:"В подготовке"},{id:"ready",name:"Утверждено"},{id:"done",name:"Проведено"}];
-var CATS=[{id:"stage",name:"Сцена",en:"Stage"},{id:"sound",name:"Звук",en:"Audio"},{id:"light",name:"Свет",en:"Light"},{id:"video",name:"Видео",en:"Video"},{id:"extra",name:"Дополнительно",en:"Extra"}];
+var CATS=[{id:"sound",name:"Звук",en:"Audio"},{id:"light",name:"Свет",en:"Light"},{id:"video",name:"Видео",en:"Video"},{id:"stage",name:"Сцена",en:"Stage"},{id:"extra",name:"Дополнительно",en:"Extra"}];
 var GENERAL=["stage","extra"];function isGen(id){return GENERAL.indexOf(id)>=0}
 var DEPTS=CATS.filter(function(c){return !isGen(c.id)});
 var SUGGEST={
@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.9","date":"11 ноября 2026","title":"Быстрая навигация по ТЗ","groups":[{"title":"Удобство работы","items":["Сцена находится перед разделом Дополнительно.","В верхней панели доступны переход к залу и кнопка Наверх при просмотре и редактировании ТЗ."]}]},
 {"version":"28.8","date":"4 ноября 2026","title":"Световой лист","groups":[{"title":"Оформление приложения","items":["Доска, редактор и лист техника получили единое оформление. Время прогонов выделено оранжевым."]}]},
 {"version":"28.7.4","date":"4 ноября 2026","title":"Выбор залов на ноутбуке","groups":[{"title":"Редактирование ТЗ","items":["Длинный список залов можно прокрутить до последней галочки. После выбора список сохраняет своё положение."]}]},
 {"version":"28.7.3","date":"3 ноября 2026","title":"Отступы в профиле","groups":[{"title":"Аккаунт","items":["Поля фамилии и имени и кнопка сохранения теперь разделены отступами."]}]},
@@ -684,6 +685,17 @@ function copyText(text){
  else{modal={t:"copy",text:text};render()}
 }
 
+function sheetNavigation(){
+ var id=route(),ev=editing&&editing.id===id?editing:evById(id);
+ if(!id||!ev)return "";
+ return '<nav class="sheet-navigation" aria-label="Навигация по ТЗ"><select id="hall-navigation" aria-label="Перейти к залу"><option value="">Перейти к залу…</option>'+evHalls(ev).map(function(h){return '<option value="'+esc(h.id)+'">'+esc(h.name)+'</option>'}).join("")+'</select><button class="btn sm" data-act="sheet-top">↑ Наверх</button></nav>';
+}
+function jumpToHall(id){
+ var evid=route(),col=evid&&collapsed(evid);
+ if(col&&col[id]){delete col[id];ls.set("tz-col-"+evid,col);render()}
+ var el=document.getElementById("hall-"+id),top=document.querySelector(".top");
+ if(el)window.scrollTo({top:window.scrollY+el.getBoundingClientRect().top-(top?top.getBoundingClientRect().height:0)-12,behavior:"smooth"});
+}
 function topBar(){
  var mode=isAdmin?'<span class="mode admin">Администратор</span>':'';
  var onBoard=!route()&&isAdmin;
@@ -693,7 +705,7 @@ function topBar(){
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
   (isAdmin?'<button class="btn" data-act="settings">Настройки'+(pendingCount()?'<span class="req-n" aria-label="Новых заявок: '+pendingCount()+'">'+pendingCount()+'</span>':'')+'</button>':'')+
   (isAdmin&&onBoard?'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'')+
-  themeBtn()+auth+
+  themeBtn()+auth+sheetNavigation()+
  '</div></header>'+conflictBanner();
 }
 function conflictBanner(){
@@ -1153,7 +1165,8 @@ app.addEventListener("click",function(e){
    cur=DEPTS.map(function(c){return c.id}).filter(function(x){return cur.indexOf(x)>=0});setDepts(evd,cur);render();break;
   case "tog":var evt=route();if(!evt)break;var cl=collapsed(evt);if(cl[d.k])delete cl[d.k];else cl[d.k]=1;ls.set("tz-col-"+evt,cl);render();break;
   case "ack":var eva=evById(d.id);if(eva){markSeen(eva);curDiff=null;flagTitle(false);render();toast("Список скрыт. Метки «Новое» останутся до выполнения")}break;
-  case "jump":var evj=route(),clj=evj&&collapsed(evj);if(clj&&clj[d.h]){delete clj[d.h];ls.set("tz-col-"+evj,clj);render()}var el=document.getElementById("hall-"+d.h);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});break;
+  case "jump":jumpToHall(d.h);break;
+  case "sheet-top":window.scrollTo({top:0,behavior:"smooth"});break;
   case "picker":pickerOpen=!pickerOpen;render();break;
   case "unhall":editing.halls=editing.halls.filter(function(h){return h!==d.h});dirty=true;render();break;
   case "add-item":ensureBlocks(editing);editing.blocks[d.h][d.c].items.push({id:uid(),name:"",qty:"",note:""});dirty=true;render();
@@ -1248,6 +1261,7 @@ app.addEventListener("input",function(e){
 });
 app.addEventListener("change",function(e){
  var t=e.target,d=t.dataset;
+ if(t.id==="hall-navigation"&&t.value){var targetHall=t.value;t.value="";jumpToHall(targetHall);return}
  if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
  if(d.done){var p=d.done.split("|");if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30)}else setCheck(p[0],p[1],t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
