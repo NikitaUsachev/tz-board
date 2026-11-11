@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.9.1","date":"11 ноября 2026","title":"Инженер проекта","groups":[{"title":"Шапка ТЗ","items":["Добавлено поле Инженер проекта. Заполненное имя видно при просмотре ТЗ."]}]},
 {"version":"28.9","date":"11 ноября 2026","title":"Быстрая навигация по ТЗ","groups":[{"title":"Удобство работы","items":["Сцена находится перед разделом Дополнительно.","В верхней панели доступны переход к залу и кнопка Наверх при просмотре и редактировании ТЗ."]}]},
 {"version":"28.8","date":"4 ноября 2026","title":"Световой лист","groups":[{"title":"Оформление приложения","items":["Доска, редактор и лист техника получили единое оформление. Время прогонов выделено оранжевым."]}]},
 {"version":"28.7.4","date":"4 ноября 2026","title":"Выбор залов на ноутбуке","groups":[{"title":"Редактирование ТЗ","items":["Длинный список залов можно прокрутить до последней галочки. После выбора список сохраняет своё положение."]}]},
@@ -602,7 +603,7 @@ function mergeChanges(base,mine,theirs,path,issues){
  issues.push({path:path,mine:copyValue(mine),theirs:copyValue(theirs)});return copyValue(mine);
 }
 function setMergedValue(obj,path,value){var p=obj;for(var i=0;i<path.length-1;i++){if(!p[path[i]])p[path[i]]={};p=p[path[i]]}if(value===undefined)delete p[path[path.length-1]];else p[path[path.length-1]]=copyValue(value)}
-function conflictLabel(path){var labels={title:"Название мероприятия",date:"Дата мероприятия",mountDate:"Монтажный день",mount:"Время монтажа",rehearsal:"Прогоны",rehearsalDay:"День прогонов",start:"Начало мероприятия",end:"Завершение",status:"Статус",manager:"Менеджер",padmin:"Администратор проекта",notes:"Общие примечания",halls:"Выбранные залы",hallRoles:"Назначение залов",items:"Список оборудования и задач",note:"Примечание",staff:"Персонал",chief:"Бригадир",files:"Файлы",links:"Ссылки",docs:"Документы",spec:"Параметры сцены",name:"Название / имя",phone:"Телефон",qty:"Количество",w:"Ширина сцены",d:"Глубина сцены",h:"Высота сцены"};
+function conflictLabel(path){var labels={title:"Название мероприятия",date:"Дата мероприятия",mountDate:"Монтажный день",mount:"Время монтажа",rehearsal:"Прогоны",rehearsalDay:"День прогонов",start:"Начало мероприятия",end:"Завершение",status:"Статус",manager:"Менеджер",padmin:"Администратор проекта",engineer:"Инженер проекта",notes:"Общие примечания",halls:"Выбранные залы",hallRoles:"Назначение залов",items:"Список оборудования и задач",note:"Примечание",staff:"Персонал",chief:"Бригадир",files:"Файлы",links:"Ссылки",docs:"Документы",spec:"Параметры сцены",name:"Название / имя",phone:"Телефон",qty:"Количество",w:"Ширина сцены",d:"Глубина сцены",h:"Высота сцены"};
  var parts=[];path.forEach(function(k){var hall=hallById(k),cat=CATS.filter(function(c){return c.id===k})[0];if(hall)parts.push(hall.name);else if(cat)parts.push(cat.name);else if(labels[k])parts.push(labels[k])});return parts.join(" · ")||"Данные мероприятия";
 }
 function readableValue(v){if(v===undefined||v===null||v==="")return "Убрано / не заполнено";if(Array.isArray(v))return v.length?v.map(function(x){return typeof x==="object"?readableValue(x):String(x)}).join("\n\n"):"Список пуст";if(typeof v==="object")return Object.keys(v).filter(function(k){return ["id","path","uploadedAt","uploading"].indexOf(k)<0}).map(function(k){var label={role:"Роль",url:"Ссылка",size:"Размер файла (байт)"}[k]||conflictLabel([k]);return label+": "+readableValue(v[k])}).join("\n");return String(v)}
@@ -761,7 +762,7 @@ function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x})
 function computeDiff(o,n){
  var out={head:[],cats:{},marks:{},mk:{},total:0};
  var add=function(k,t){(out.cats[k]=out.cats[k]||[]).push(t);out.total++};
- [["title","Название"],["mountDate","Монтажный день"],["date","Проведение мероприятия"],["mount","Монтаж с"],["rehearsal","Прогоны / репетиции"],["rehearsalDay","Прогоны"],["start","Начало"],["end","Завершение"],["status","Статус"],["manager","Менеджер проекта"],["padmin","Администратор проекта"],["notes","Примечания"]].forEach(function(f){
+ [["title","Название"],["mountDate","Монтажный день"],["date","Проведение мероприятия"],["mount","Монтаж с"],["rehearsal","Прогоны / репетиции"],["rehearsalDay","Прогоны"],["start","Начало"],["end","Завершение"],["status","Статус"],["manager","Менеджер проекта"],["padmin","Администратор проекта"],["engineer","Инженер проекта"],["notes","Примечания"]].forEach(function(f){
   var a=(o[f[0]]||"").trim?String(o[f[0]]||"").trim():"",b=String(n[f[0]]||"").trim();if(a===b)return;
   var v=f[0]==="rehearsalDay"?(b==="mount"?"в монтажный день":"в день мероприятия"):(f[0]==="date"||f[0]==="mountDate")?(fmtDate(b,{day:"numeric",month:"long"})||"—"):f[0]==="status"?stName(b):f[0]==="notes"?"изменены":(b||"—");
   out.head.push(f[1]+": "+(f[0]==="notes"?v:(f[0]==="date"||f[0]==="mountDate"||f[0]==="rehearsalDay"||f[0]==="status"||!a?"":(a+" → "))+v));out.total++});
@@ -851,6 +852,7 @@ function factList(ev){
  rows.push(["Завершение",ev.end||"",""]);
  rows.push(["Менеджер проекта",mg,"txt"]);
  if(pa)rows.push(["Администратор проекта",pa,"txt"]);
+ if((ev.engineer||"").trim())rows.push(["Инженер проекта",ev.engineer.trim(),"txt"]);
  return '<dl class="flist">'+rows.map(function(r){return '<div class="frow'+(r[0]==="Прогоны / репетиции с"?" rehearsal":r[0]==="Начало мероприятия"?" event-start":"")+'"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';
 }
 function factCell(label,key,val,type,isEdit,extra){
@@ -880,7 +882,8 @@ function headView(ev,isEdit){
  }
  h+='</div></div>';
  if(isEdit)h+='<div class="team"><label class="team-cell"><span class="eyebrow">Менеджер проекта</span><input id="f-manager" data-f="manager" value="'+esc(ev.manager)+'" placeholder="Фамилия Имя" autocomplete="off"></label>'+
-  '<label class="team-cell"><span class="eyebrow">Администратор проекта</span><input id="f-padmin" data-f="padmin" value="'+esc(ev.padmin)+'" placeholder="Фамилия Имя (если есть)" autocomplete="off"></label></div>';
+  '<label class="team-cell"><span class="eyebrow">Администратор проекта</span><input id="f-padmin" data-f="padmin" value="'+esc(ev.padmin)+'" placeholder="Фамилия Имя (если есть)" autocomplete="off"></label>'+
+  '<label class="team-cell"><span class="eyebrow">Инженер проекта</span><input id="f-engineer" data-f="engineer" value="'+esc(ev.engineer||"")+'" placeholder="Фамилия Имя (если есть)" autocomplete="off"></label></div>';
  if(isEdit)h+='<label class="halls-row"><span class="eyebrow">Общие примечания</span><textarea id="f-notes" data-f="notes" placeholder="Контакты, доступ на площадку, особые условия">'+esc(ev.notes)+'</textarea></label>';
  else if((ev.notes||"").trim())h+='<div class="halls-row"><span class="eyebrow">Примечания</span><p class="notes">'+esc(ev.notes)+'</p></div>';
  var docs=ev.docs||{};
