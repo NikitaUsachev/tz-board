@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
+const piece=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
+const context={CATS:[{id:'video',name:'Видео'}],hallById:()=>({name:'Brook Hall'}),modal:null,render(){}};
+vm.createContext(context);
+vm.runInContext(piece('function eventIssues(', 'function focusReviewField('),context);
+const valid={title:'Конференция',date:'2026-11-11',status:'prep',start:'18:00',engineer:'Иванов Иван',halls:['h'],blocks:{h:{video:{items:[{id:'i',name:'Экран',qty:'1'}]}}}};
+assert.equal(context.eventIssues(valid).length,0);
+assert.equal(context.eventIssues({status:'draft'}).length,0);
+assert.equal(context.eventIssues({...valid,title:'',date:'',halls:[]}).filter(x=>x.required).length,3);
+assert.equal(context.eventIssues({...valid,engineer:'',start:''}).filter(x=>!x.required).length,2);
+const missing=structuredClone(valid);missing.blocks.h.video.items[0].qty='';
+assert.equal(context.eventIssues(missing)[0].field,'q-h-video-i');
+assert.equal(context.reviewEvent(missing,()=>{}),false);
+assert.equal(context.modal.t,'completeness');
+console.log('PASS: draft exemption, required fields, optional warnings, quantity field targeting');
