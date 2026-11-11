@@ -758,7 +758,7 @@ function topBar(){
  var onBoard=!route()&&isAdmin;
  var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
  return '<header class="top"><div class="top-in gut">'+
-  '<div class="brand"><h1>ТЗ на мероприятия</h1>'+mode+'</div>'+
+  '<div class="brand"><h1>ТЗ на мероприятия | Серп и Молот</h1>'+mode+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
   (isAdmin?'<button class="btn" data-act="settings">Настройки'+(pendingCount()?'<span class="req-n" aria-label="Новых заявок: '+pendingCount()+'">'+pendingCount()+'</span>':'')+'</button>':'')+
   (isAdmin&&onBoard?'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'')+
@@ -1086,7 +1086,7 @@ function modalView(){
 var AUTH_ERR={"Invalid login credentials":"Неверная почта или пароль.","Email not confirmed":"Почта ещё не подтверждена. Откройте письмо от Supabase и нажмите ссылку подтверждения.","User already registered":"Этот адрес уже зарегистрирован. Войдите или восстановите пароль.","Password should be at least 6 characters.":"Пароль слишком короткий."};
 function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m])return AUTH_ERR[m];if(/email rate limit/i.test(m))return "Лимит писем исчерпан: достигнуто ограничение отправки писем. Попробуйте позже; если ошибка повторится, администратору нужно проверить SMTP и лимиты Auth.";if(/rate|limit|seconds/i.test(m))return "Слишком много попыток. Подождите минуту и попробуйте снова.";return m}
 function authView(){
- var h='<div class="auth gut"><div class="auth-top">'+themeBtn()+'</div><div class="auth-card"><div class="auth-brand"><span class="eyebrow">Техническое обеспечение мероприятий</span><h1>ТЗ на мероприятия</h1></div>';
+ var h='<div class="auth gut"><div class="auth-top">'+themeBtn()+'</div><div class="auth-card"><div class="auth-brand"><span class="eyebrow">Техническое обеспечение мероприятий</span><h1>ТЗ на мероприятия | Серп и Молот</h1></div>';
  if(session&&!isAdmin){
   h+='<p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+(reqStatus==="rejected"?'<p class="req-state rej"><b>Заявка отклонена.</b> Если это ошибка, свяжитесь с администратором.</p>':'<p class="req-state"><b>Заявка отправлена.</b> Администратор увидит её в «Настройках» и подтвердит доступ. После этого нажмите «Проверить снова».</p>')+''+
    '<div class="bar"><button class="btn danger" data-act="logout">Выйти</button><span class="sp"></span><button class="btn primary" data-act="recheck">Проверить снова</button></div>';
