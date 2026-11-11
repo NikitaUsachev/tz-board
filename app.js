@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.9.2","date":"11 ноября 2026","title":"Компактный просмотр ТЗ","groups":[{"title":"Для техников","items":["Убран общий перечень изменений над ТЗ. Новые и изменённые позиции отмечаются внутри залов."]}]},
 {"version":"28.9.1","date":"11 ноября 2026","title":"Инженер проекта","groups":[{"title":"Шапка ТЗ","items":["Добавлено поле Инженер проекта. Заполненное имя видно при просмотре ТЗ."]}]},
 {"version":"28.9","date":"11 ноября 2026","title":"Быстрая навигация по ТЗ","groups":[{"title":"Удобство работы","items":["Сцена находится перед разделом Дополнительно.","В верхней панели доступны переход к залу и кнопка Наверх при просмотре и редактировании ТЗ."]}]},
 {"version":"28.8","date":"4 ноября 2026","title":"Световой лист","groups":[{"title":"Оформление приложения","items":["Доска, редактор и лист техника получили единое оформление. Время прогонов выделено оранжевым."]}]},
@@ -828,7 +829,7 @@ function sheetView(id){
  if(isEdit){curDiff=null;curMarks={};return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
  if(checksFor!==ev.id){checksFor=ev.id;checks={};checksKey="";loadChecks(ev.id)}
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);if(curDiff)storeMarks(ev,curDiff);curMarks=activeMarks(ev);
- return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+changesView(ev,curDiff,depts)+headView(ev,isEdit)+telegramLink(ev)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
+ return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+telegramLink(ev)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return '';
