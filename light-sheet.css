@@ -15,8 +15,10 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 
 .frow.event-start dd:not(.dim),.fact:has(#f-start)>.eyebrow:first-child{background:#b5dafa;color:#142433;padding:2px 7px;outline:1px solid #789bb2}
 
-.sheet-navigation{display:flex;align-items:center;gap:8px;flex:1 0 100%;padding-top:6px;border-top:1px solid var(--line)}
-.sheet-navigation select{flex:1;min-width:0;max-width:360px;font-size:16px}
+.sheet-navigation{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex:1 0 100%;padding-top:6px;border-top:1px solid var(--line)}
+.sheet-navigation select{flex:0 1 260px;width:260px;min-width:0;max-width:100%;font-size:16px}
+.sheet-navigation .btn{flex:none}
+@media(max-width:560px){.sheet-navigation select{flex:1;width:auto;max-width:none}}
 @media print{.sheet-navigation{display:none}}
 
 
