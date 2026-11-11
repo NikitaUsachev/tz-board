@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.10","date":"11 ноября 2026","title":"Проверка заполнения и стабильные отметки","groups":[{"title":"Работа с ТЗ","items":["При сохранении рабочего ТЗ и смене статуса приложение проверяет заполнение и предлагает перейти к нужному полю. Черновики можно сохранять незаполненными.","Обновление готовности зала больше не перерисовывает всю страницу. При появлении кнопки готовности сохраняется высота блока.","Уточнены начертания оборудования и монтажных примечаний."]}]},
 {"version":"28.9.2","date":"11 ноября 2026","title":"Компактный просмотр ТЗ","groups":[{"title":"Для техников","items":["Убран общий перечень изменений над ТЗ. Новые и изменённые позиции отмечаются внутри залов."]}]},
 {"version":"28.9.1","date":"11 ноября 2026","title":"Инженер проекта","groups":[{"title":"Шапка ТЗ","items":["Добавлено поле Инженер проекта. Заполненное имя видно при просмотре ТЗ."]}]},
 {"version":"28.9","date":"11 ноября 2026","title":"Быстрая навигация по ТЗ","groups":[{"title":"Удобство работы","items":["Сцена находится перед разделом Дополнительно.","В верхней панели доступны переход к залу и кнопка Наверх при просмотре и редактировании ТЗ."]}]},
@@ -398,8 +399,15 @@ function refreshTelegram(id,request){
   if(request!==techRequest||route()!==id||isAdmin)return;
   var info=r.data;
   var next=!r.error&&info&&/^[A-Za-z0-9_]{5,32}$/.test(info.username)?{id:id,username:info.username,ready:info.ready||{}}:null;
-  if(JSON.stringify(next)!==JSON.stringify(telegramEvent)){telegramEvent=next;if(!modal&&!editing)render()}
- }).catch(function(){if(request===techRequest&&route()===id&&telegramEvent){telegramEvent=null;render()}});
+  if(JSON.stringify(next)!==JSON.stringify(telegramEvent)){telegramEvent=next;if(!modal&&!editing)refreshTelegramView(id)}
+ }).catch(function(){if(request===techRequest&&route()===id&&telegramEvent){telegramEvent=null;refreshTelegramView(id)}});
+}
+function refreshTelegramView(id){
+ var ev=evById(id),slot=document.getElementById("telegram-link");
+ if(!ev||!slot)return;
+ var html=telegramLink(ev);
+ if(slot.innerHTML!==html)slot.innerHTML=html;
+ paintChecks(id);
 }
 function telegramLink(ev){
  if(isAdmin||telegramEvent?.id!==ev.id||!/^[A-Za-z0-9_-]{1,64}$/.test(ev.id))return "";
@@ -490,9 +498,12 @@ function paintChecks(id,task){
  });
  template.content.querySelectorAll(".hall").forEach(function(next){
   var hall=document.getElementById(next.id),old=hall&&hall.querySelector(".hall-progress"),fresh=next.querySelector(".hall-progress");
-  if(old&&fresh&&old.innerHTML!==fresh.innerHTML)old.innerHTML=fresh.innerHTML;
+  if(old&&fresh&&old.innerHTML!==fresh.innerHTML){
+   old.style.minHeight=Math.max(old.getBoundingClientRect().height,parseFloat(old.style.minHeight)||0)+"px";
+   old.innerHTML=fresh.innerHTML;
+  }
  });
- if(anchor){var shift=anchor.getBoundingClientRect().top-top;if(Math.abs(shift)>=1)window.scrollBy(0,shift)}
+ if(anchor){var shift=anchor.getBoundingClientRect().top-top;if(Math.abs(shift)>=1)window.scrollBy({top:shift,left:0,behavior:"instant"})}
 }
 function loadChecks(id){if(!id)return Promise.resolve();var request=++checkRequest;
  return sb.rpc("get_checks",{p_id:id}).then(function(r){if(r.error||route()!==id||request!==checkRequest||Object.keys(checkPending).length)return;var m={};(r.data||[]).forEach(function(x){m[x.item_id]={by:x.by_name||"",at:x.at}});
@@ -558,10 +569,53 @@ function loadAdmins(){return sb.from("admins").select("email").order("email").th
 function cleanEvent(ev){var e=clone(ev);if(e.hallRoles){Object.keys(e.hallRoles).forEach(function(k){var v=String(e.hallRoles[k]||"").trim();if(!v||(e.halls||[]).indexOf(k)<0)delete e.hallRoles[k];else e.hallRoles[k]=v});if(!Object.keys(e.hallRoles).length)delete e.hallRoles}delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});var sk=Object.keys(b.spec).filter(function(k){return k!=="id"});if(!sk.length)delete b.spec;else if(!b.spec.id)b.spec.id=uid()}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
 function fail(e,prefix){busy=false;showSaving(false);toast((prefix||"Не удалось сохранить")+": "+((e&&e.message)||"ошибка сети"));return false}
 
-function setStatus(id,status){
+/* Completeness review shared by editor saves and board status changes. */
+function eventIssues(ev){
+ if(ev.status==="draft"||ev.status==="done")return [];
+ var issues=[],add=function(label,field,required){issues.push({label:label,field:field,required:!!required})};
+ if(!(ev.title||"").trim()||ev.title==="Без названия")add("Укажите название мероприятия","f-title",true);
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(ev.date||""))add("Укажите дату мероприятия","f-date",true);
+ if(!(ev.halls||[]).length)add("Выберите хотя бы один зал","hall-pick-toggle",true);
+ if(!(ev.start||"").trim())add("Не указано время начала","f-start",false);
+ if(!(ev.engineer||"").trim())add("Не указан инженер проекта","f-engineer",false);
+ (ev.halls||[]).forEach(function(hid){
+  var hall=hallById(hid);
+  CATS.forEach(function(cat){
+   var block=ev.blocks&&ev.blocks[hid]&&ev.blocks[hid][cat.id];
+   (block&&block.items||[]).forEach(function(item){
+    if((item.name||"").trim()&&!String(item.qty||"").trim())add((hall?hall.name:hid)+" · "+cat.name+" · "+item.name+" — нет количества","q-"+hid+"-"+cat.id+"-"+item.id,false);
+   });
+  });
+ });
+ return issues;
+}
+function reviewEvent(ev,proceed){
+ var issues=eventIssues(ev);
+ if(!issues.length)return true;
+ modal={t:"completeness",ev:ev,issues:issues,proceed:proceed};
+ render();return false;
+}
+function focusReviewField(index){
+ var review=modal,issue=review&&review.issues[index];if(!issue)return;
+ modal=null;
+ if(!editing||editing.id!==review.ev.id){
+  if(!startEdit(review.ev))return;
+  history.replaceState(null,"",location.pathname+location.search+"#ev-"+editing.id);
+ }
+ render();
+ var field=document.getElementById(issue.field);
+ if(field){
+  field.focus({preventScroll:true});
+  var top=document.querySelector(".top");
+  window.scrollTo({top:window.scrollY+field.getBoundingClientRect().top-(top?top.getBoundingClientRect().height:0)-20,behavior:"instant"});
+ }
+}
+function setStatus(id,status,reviewed){
  var ev=evById(id);if(!ev||ev.deletedAt||!isAdmin||busy)return;
  var version=versions[id];if(version==null){toast("Обновите доску перед сменой статуса");return}
- var e=cleanEvent(ev);e.status=status;busy=true;
+ var e=cleanEvent(ev);e.status=status;
+ if(reviewed!==JSON.stringify(e)&&!reviewEvent(e,function(){setStatus(id,status,JSON.stringify(e))}))return;
+ busy=true;
  sb.from("events").update({data:e}).eq("id",id).eq("version",version).select("id").then(function(r){busy=false;
   if(r.error)toast("Не удалось изменить статус: "+r.error.message);
   else if(!r.data||!r.data.length)toast("ТЗ изменилось или доступ отозван. Доска обновлена — повторите смену статуса.");
@@ -633,8 +687,9 @@ async function verifyBooking(ev){
  if(matches.length){modal={t:"booking",event:ev,matches:matches};render();return false}return true;
 }
 function saveEvent(ev,isNew,unused,retried){return performSave(ev,isNew,!!retried)}
-async function performSave(ev,isNew,retried){
+async function performSave(ev,isNew,retried,reviewed){
  if(!isAdmin||busy)return false;
+ if(!reviewed&&!reviewEvent(ev,function(){performSave(ev,isNew,retried,true)}))return false;
  var data=cleanEvent(ev);busy=true;showSaving(true);
  try{
   if(!await verifyBooking(data)){busy=false;showSaving(false);return false}
@@ -829,7 +884,7 @@ function sheetView(id){
  if(isEdit){curDiff=null;curMarks={};return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
  if(checksFor!==ev.id){checksFor=ev.id;checks={};checksKey="";loadChecks(ev.id)}
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);if(curDiff)storeMarks(ev,curDiff);curMarks=activeMarks(ev);
- return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+telegramLink(ev)+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
+ return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+'<div id="telegram-link">'+telegramLink(ev)+'</div>'+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return '';
@@ -877,7 +932,7 @@ function headView(ev,isEdit){
  h+='<div class="halls-row"><span class="eyebrow">'+(halls.length>1?"Залы":"Зал")+'</span><div class="chips">';
  if(isEdit){
   h+=halls.map(function(x){return '<span class="hall-chip">'+esc(x.name)+'<button class="btn ghost sm" style="padding:0 2px" data-act="unhall" data-h="'+x.id+'" aria-label="Убрать зал '+esc(x.name)+'"><span class="x">×</span></button></span>'}).join("");
-  h+='<div class="picker"><button class="btn sm" data-act="picker" aria-expanded="'+pickerOpen+'">Выбрать залы ▾</button>'+(pickerOpen?pickerPop(ev):"")+'</div>';
+  h+='<div class="picker"><button id="hall-pick-toggle" class="btn sm" data-act="picker" aria-expanded="'+pickerOpen+'">Выбрать залы ▾</button>'+(pickerOpen?pickerPop(ev):"")+'</div>';
  }else{
   h+=halls.length?halls.map(function(x){var r=hallRole(ev,x.id);return '<button class="hall-chip" data-act="jump" data-h="'+x.id+'">'+esc(x.name)+(r?'<span class="hc-role">'+esc(r)+'</span>':'')+'</button>'}).join(""):'<span class="none">Не выбран</span>';
  }
@@ -994,6 +1049,7 @@ function modalView(){
  if(!modal)return "";
  if(modal.t==="releases")return isAdmin?releasesView():"";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
+ if(modal.t==="completeness")return wrap('<h2>Проверьте ТЗ перед сохранением</h2><p>Нажмите на пункт, чтобы перейти к полю.</p><ul class="completeness-list">'+modal.issues.map(function(issue,index){return '<li><button class="linkbtn" data-act="review-field" data-index="'+index+'">'+esc(issue.label)+'</button>'+(issue.required?'<span class="hint">Обязательно для рабочего ТЗ</span>':'<span class="hint">Рекомендуется заполнить</span>')+'</li>'}).join("")+'</ul><div class="bar"><button class="btn" data-act="close">Вернуться</button>'+(modal.issues.some(function(issue){return issue.required})?'':'<button class="btn primary" data-act="review-save">Сохранить с предупреждениями</button>')+'</div>',"Проверка заполнения ТЗ");
  if(modal.t==="leave")return wrap('<h2>Есть несохранённые правки</h2><p>Можно остаться в редакторе или оставить изменения для восстановления и перейти дальше.</p><div class="bar"><button class="btn" data-act="stay">Остаться</button><button class="btn primary" data-act="leave-draft">Оставить изменения и перейти</button></div>',"Несохранённые правки");
  if(modal.t==="recover")return isAdmin?wrap('<h2>Найдены несохранённые изменения</h2><p>Для этого ТЗ в браузере остались несохранённые правки.</p><div class="bar"><button class="btn primary" data-act="recover-draft" data-id="'+esc(modal.id)+'">Восстановить изменения</button><button class="btn" data-act="open-saved" data-id="'+esc(modal.id)+'">Не применять изменения</button></div>',"Восстановление изменений"):"";
  if(modal.t==="drafts")return isAdmin?wrap('<h2>Несохранённые изменения</h2><p class="hint">Здесь находятся правки, которые вы ещё не сохранили в ТЗ. Они доступны только вам в этом браузере. Очистка данных браузера удалит эти правки.</p>'+Object.keys(drafts()).map(function(id){var x=drafts()[id];return '<div class="req"><div class="req-i"><b>'+esc(x.event.title||"Без названия")+'</b><span class="hint">'+esc(new Date(x.at).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="recover-draft" data-id="'+esc(id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Несохранённые изменения"):"";
@@ -1080,7 +1136,7 @@ function render(){
    if(focusedHall){var input=Array.from(options.querySelectorAll("input")).find(function(el){return el.dataset.hallpick===focusedHall});if(input)input.focus({preventScroll:true})}
   }
  }
- if(aid){var el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus();if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
+ if(aid){var el=document.getElementById(aid);if(el&&el!==document.activeElement){el.focus({preventScroll:true});if(sel)try{el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
 }
 
 /* ---------- events ---------- */
@@ -1143,6 +1199,8 @@ app.addEventListener("click",function(e){
   case "cancel":if(dirty){exitArmed=true;render()}else leaveEdit();break;
   case "discard":leaveEdit(true);break;
   case "save":saveEditing();break;
+  case "review-field":focusReviewField(Number(d.index));break;
+  case "review-save":if(modal&&modal.t==="completeness"&&!modal.issues.some(function(issue){return issue.required})){var proceed=modal.proceed;modal=null;render();proceed()}break;
   case "merge-choice":if(conflict){conflict.choices[+d.i]=d.side;render()}break;
   case "merge-save":applyConflictChoices();break;
   case "close-conflict":conflict=null;render();break;
@@ -1328,5 +1386,6 @@ sb.auth.onAuthStateChange(function(ev,s){
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&!editing&&authReady)scheduleReload()});
 setInterval(function(){if(authReady&&!isAdmin&&route()&&!document.hidden)loadTech(route())},60000);
 })();
+
 
 
