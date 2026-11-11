@@ -8,7 +8,7 @@ async function status(result, rejection){
  const filters=[],updates=[],messages=[];let reloads=0;
  const current={id:"ev",title:"Original",status:"draft"};
  const query={update(p){updates.push(p);return this},eq(k,v){filters.push([k,v]);return this},select(){return rejection?Promise.reject(Error("network")):Promise.resolve(result)}};
- const c={evById:()=>current,isAdmin:true,busy:false,versions:{ev:7},cleanEvent:x=>structuredClone(x),sb:{from:()=>query},toast:x=>messages.push(x),loadAll:()=>{reloads++}};
+ const c={reviewEvent:()=>true,evById:()=>current,isAdmin:true,busy:false,versions:{ev:7},cleanEvent:x=>structuredClone(x),sb:{from:()=>query},toast:x=>messages.push(x),loadAll:()=>{reloads++}};
  vm.createContext(c);vm.runInContext(part("function setStatus(","function deleteEvent("),c);
  c.setStatus("ev","ready");await new Promise(setImmediate);
  assert.deepEqual(filters,[["id","ev"],["version",7]]);
@@ -33,4 +33,5 @@ function drag(){
  assert.equal(c.itemDrag,null);
 }
 (async()=>{await status({data:[{id:"ev"}]});await status({data:[]});await status({error:{message:"denied"}});await status(null,true);await uploads();drag();console.log("PASS: status success/conflict/error/network, upload ownership, hall drag guard, JS syntax")})().catch(e=>{console.error(e);process.exitCode=1});
+
 

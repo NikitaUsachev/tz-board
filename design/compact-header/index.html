@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Компактная шапка · Световой лист</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f6f2;color:#191c1d;font:16px/1.45 "Helvetica Neue",Helvetica,Arial,sans-serif}main{max-width:780px;margin:auto;padding:16px 16px 60px}button,select{font:inherit;color:inherit;cursor:pointer;border:1px solid #a2abae;border-radius:4px;background:#fff;padding:9px 12px}nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}button[aria-pressed=true]{background:#1c3849;color:white;border-color:#1c3849}.intro{font-size:14px;color:#515b5d;margin-bottom:16px}header{background:#b5dafa;padding:22px;color:#142433}h1{font-weight:300;letter-spacing:-.04em;font-size:40px;line-height:1.1;margin:10px 0}small{font-size:12px;letter-spacing:.04em}dl{margin-bottom:0}dl>div{display:flex;justify-content:space-between;gap:20px;border-top:1px solid #879fab;padding:10px 0}dt{font-size:14px}dd{margin:0;text-align:right;overflow-wrap:anywhere}time{font-family:ui-monospace,monospace;font-weight:500}.rehearsal{background:#ff955f;color:#262019;padding:3px 7px}.start{background:#e0f0ff;color:#142433;border:1px solid #789bb2;padding:2px 6px}.times{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}.times span{font-size:14px}.critical{margin:16px 0 0;padding-top:12px;border-top:1px solid #879fab;font-size:14px}summary{cursor:pointer;min-height:44px;display:flex;align-items:center;text-decoration:underline}details a{color:inherit}details .files{display:grid;gap:8px;margin-top:14px}.sticky{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 0;background:#f6f6f2;border-bottom:1px solid #c6c9c6}.sticky select{min-width:0;flex:1}.sticky button{flex:none}h2{font-size:25px;font-weight:400;margin:24px 0 10px}h3{font-size:18px;font-weight:500}.row{display:grid;grid-template-columns:22px 1fr auto;gap:5px 10px;padding:14px 0;border-top:1px solid #c6c9c6}.row input{width:19px;height:19px;margin:2px 0;accent-color:#1c3849}.row .note{grid-column:2/4;color:#515b5d;font-size:14px}.who{grid-column:2/4;min-height:20px;font-size:12px;color:#276343}.qty{font-family:ui-monospace,monospace}.compact h1{font-size:28px}.compact header{padding:18px}.compact .full-details{display:none}.full .compact-details,.full .times{display:none}.full .critical{display:none}[hidden]{display:none!important}a{color:#1c3849}
+</style>
+<main class="compact" id="demo">
+<p class="intro">Макет для обсуждения · Brook Hall · Демонстрационные данные</p>
+<nav aria-label="Вариант шапки"><button type="button" data-mode="compact" aria-pressed="true">Компактная</button><button type="button" data-mode="full" aria-pressed="false">Развёрнутая</button></nav>
+<header>
+<small>ТЗ / 11 НОЯБРЯ 2026</small>
+<h1>Конференция партнёров</h1>
+<div class="times"><span>Монтаж <time>09:00</time></span><span>Прогоны <time class="rehearsal">13:30</time></span><span>Начало <time class="start">18:00</time></span></div>
+<div class="full-details" id="full"></div>
+<details class="compact-details"><summary>Контакты, документы и все сведения ▾</summary><div id="expanded"></div></details>
+<p class="critical"><strong>Важное примечание</strong><br>Разгрузка через служебный вход. Высота экрана — по схеме.</p>
+</header>
+<div class="sticky"><select id="hall" aria-label="Выбрать зал"><option>Brook Hall</option><option>Main Hall</option></select><button type="button" id="top">↑ Наверх</button></div>
+<h2 id="hall-title">Brook Hall</h2><p>Видео · Конференция</p><p class="intro">В этом варианте важное примечание видно сразу. Контакты и документы открываются по нажатию.</p>
+<div id="equipment"></div>
+<p class="intro">Отметки работают только в макете.</p>
+<a href="../future/#light/tech">Другие макеты «Светового листа» ↗</a>
+</main>
+<script>
+const facts=[['Монтаж','09:00'],['Прогоны','13:30'],['Начало','18:00'],['Завершение','21:00'],['Менеджер проекта','Анна · демо'],['Администратор проекта','Михаил · демо'],['Инженер проекта','Алексей · демо']];
+const detail='<dl>'+facts.map(([label,value])=>'<div><dt>'+label+'</dt><dd>'+value+'</dd></div>').join('')+'</dl><div class="files"><p>Технический сценарий · PDF</p><p>Режиссёрский сценарий · PDF</p><p>Общая схема · PDF</p></div>';
+document.getElementById('full').innerHTML=detail;
+document.getElementById('expanded').innerHTML=detail;
+document.querySelectorAll('[data-mode]').forEach(button=>button.onclick=()=>{document.getElementById('demo').className=button.dataset.mode;document.querySelectorAll('[data-mode]').forEach(item=>item.setAttribute('aria-pressed',item===button))});
+const items=[['Экран 4,5 × 2,5 м','1 шт.','Собираем на тотемах'],['Суфлёр','2 шт.','Перед сценой'],['ТВ 65″ на стойке','1 шт.','Справа от сцены'],['Видеопроцессор','1 шт.','Проверить резервный сигнал'],['Ноутбук презентаций','1 шт.','Проверить шрифты и видео'],['Кликер','1 шт.','Проверить с места выступления']];
+document.getElementById('equipment').innerHTML=items.map(([name,qty,note])=>'<label class="row"><input type="checkbox"><span>'+name+'</span><span class="qty">'+qty+'</span><span class="note">'+note+'</span><span class="who"></span></label>').join('');
+document.getElementById('equipment').onchange=e=>{e.target.closest('.row').querySelector('.who').textContent=e.target.checked?'Выполнено · демо':''};
+document.getElementById('hall').onchange=e=>document.getElementById('hall-title').textContent=e.target.value;
+document.getElementById('top').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+</script>
+</html>

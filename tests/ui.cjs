@@ -30,6 +30,27 @@ async function boot(admin,deleted=false,telegram=false,done=[]){
  a.click('leave-draft');a.hash();assert.match(a.app.innerHTML,/Несохранённые изменения \(1\)/);
  const saved=JSON.parse(a.store.get('tz-drafts-admin@example.com'));const id=Object.keys(saved)[0];assert.equal(saved[id].event.title,'My draft');
  a.click('recover-draft',{id});assert.match(a.app.innerHTML,/My draft/);a.click('save');await tick();await tick();assert.ok(a.rows.some(r=>r.data.title==='My draft'));
+
+ const review=await boot(true);
+ review.click('new',{st:'prep'});review.hash();
+ review.click('save');await tick();
+ assert.match(review.app.innerHTML,/Проверьте ТЗ перед сохранением/);
+ assert.match(review.app.innerHTML,/Выберите хотя бы один зал/);
+ assert.ok(!review.app.innerHTML.includes('data-act="review-save"'));
+ assert.equal(review.rows.length,1);
+ review.click('review-field',{index:'0'});
+ assert.match(review.app.innerHTML,/id="f-title"/);
+ for(const [field,value] of [['title','Complete event'],['date','2026-12-03']])
+  for(const listen of review.listeners.input)listen({target:{dataset:{f:field},value}});
+ for(const listen of review.listeners.change)listen({target:{dataset:{hallpick:'h'},checked:true}});
+ review.click('save');await tick();
+ assert.match(review.app.innerHTML,/Не указано время начала/);
+ assert.match(review.app.innerHTML,/Не указан инженер проекта/);
+ assert.match(review.app.innerHTML,/data-act="review-save"/);
+ assert.equal(review.rows.length,1);
+ review.click('review-save');await tick();await tick();
+ assert.equal(review.rows.length,2);
+ assert.equal(review.rows[1].data.title,'Complete event');
  const profile=await boot(true);profile.click("account");assert.match(profile.app.innerHTML,/profile-form/);
  for(const [id,value] of [["profile-last","Усачёв"],["profile-first","Никита"]])for(const listen of profile.listeners.input)listen({target:{id,value,dataset:{}}});
  for(const listen of profile.listeners.submit)listen({preventDefault(){},target:{id:"profile-form"}});
@@ -44,3 +65,4 @@ async function boot(admin,deleted=false,telegram=false,done=[]){
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);
  console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, first-check name prompt, hidden trash events');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
