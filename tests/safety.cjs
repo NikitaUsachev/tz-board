@@ -22,7 +22,7 @@ class DB{
 }
 function env(rows){
  const db=new DB(rows),store=new Map(),messages=[];const current=rows[0];
- const c={console,Date,JSON,Object,Array,Promise,Error,String,crypto:require('node:crypto').webcrypto,isAdmin:true,busy:false,editingVersion:current?.version,editingBase:clone(current?.data||{}),editing:clone(current?.data||{}),editingOrig:[],dirty:true,exitArmed:false,conflict:null,modal:null,state:{events:clone(rows.map(r=>({...r.data,id:r.id})))},versions:Object.fromEntries(rows.map(r=>[r.id,r.version])),CATS:[{id:'sound',name:'Звук'}],hallById:()=>null,
+ const c={reviewEvent:()=>true,console,Date,JSON,Object,Array,Promise,Error,String,crypto:require('node:crypto').webcrypto,isAdmin:true,busy:false,editingVersion:current?.version,editingBase:clone(current?.data||{}),editing:clone(current?.data||{}),editingOrig:[],dirty:true,exitArmed:false,conflict:null,modal:null,state:{events:clone(rows.map(r=>({...r.data,id:r.id})))},versions:Object.fromEntries(rows.map(r=>[r.id,r.version])),CATS:[{id:'sound',name:'Звук'}],hallById:()=>null,
   clone,cleanEvent:clone,allPaths:()=>[],myEmail:()=> 'admin@example.com',showSaving(){},render(){},toast:m=>messages.push(m),route:()=>current?.id,location:{hash:'',pathname:'/',search:''},history:{replaceState(){}},go(){},ensureBlocks(){},renewChangedTasks(){},uid:()=>require('node:crypto').randomUUID(),sb:{from:()=>db.from()},
   localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},
   ls:{get:k=>store.has(k)?JSON.parse(store.get(k)):null,set:(k,v)=>store.set(k,JSON.stringify(v))},
@@ -70,3 +70,4 @@ function mergeLists(){
  issues=[];c.mergeChanges(['base'],['mine'],['theirs'],['items'],issues);assert.equal(issues.length,1);
 }
 (async()=>{new vm.Script(source);await merge();await choices();await deletedWhileEditing();await trash();await bookings();drafts();mergeLists();console.log('PASS: independent merge, explicit field choices, no forced overwrite, concurrent delete, trash/restore, room/date checks, local draft recovery')})().catch(e=>{console.error(e);process.exitCode=1});
+
