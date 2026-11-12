@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.11","date":"12 ноября 2026","title":"Саундчеки музыкальных групп","groups":[{"title":"Шапка ТЗ","items":["Добавлен список саундчеков: название группы, дата и время. Можно добавить несколько групп и удалить лишние строки. Заполненное расписание видно техникам."]}]},
 {"version":"28.10","date":"11 ноября 2026","title":"Проверка заполнения и стабильные отметки","groups":[{"title":"Работа с ТЗ","items":["При сохранении рабочего ТЗ и смене статуса приложение проверяет заполнение и предлагает перейти к нужному полю. Черновики можно сохранять незаполненными.","Обновление готовности зала больше не перерисовывает всю страницу. При появлении кнопки готовности сохраняется высота блока.","Уточнены начертания оборудования и монтажных примечаний."]}]},
 {"version":"28.9.2","date":"11 ноября 2026","title":"Компактный просмотр ТЗ","groups":[{"title":"Для техников","items":["Убран общий перечень изменений над ТЗ. Новые и изменённые позиции отмечаются внутри залов."]}]},
 {"version":"28.9.1","date":"11 ноября 2026","title":"Инженер проекта","groups":[{"title":"Шапка ТЗ","items":["Добавлено поле Инженер проекта. Заполненное имя видно при просмотре ТЗ."]}]},
@@ -658,7 +659,7 @@ function mergeChanges(base,mine,theirs,path,issues){
  issues.push({path:path,mine:copyValue(mine),theirs:copyValue(theirs)});return copyValue(mine);
 }
 function setMergedValue(obj,path,value){var p=obj;for(var i=0;i<path.length-1;i++){if(!p[path[i]])p[path[i]]={};p=p[path[i]]}if(value===undefined)delete p[path[path.length-1]];else p[path[path.length-1]]=copyValue(value)}
-function conflictLabel(path){var labels={title:"Название мероприятия",date:"Дата мероприятия",mountDate:"Монтажный день",mount:"Время монтажа",rehearsal:"Прогоны",rehearsalDay:"День прогонов",start:"Начало мероприятия",end:"Завершение",status:"Статус",manager:"Менеджер",padmin:"Администратор проекта",engineer:"Инженер проекта",notes:"Общие примечания",halls:"Выбранные залы",hallRoles:"Назначение залов",items:"Список оборудования и задач",note:"Примечание",staff:"Персонал",chief:"Бригадир",files:"Файлы",links:"Ссылки",docs:"Документы",spec:"Параметры сцены",name:"Название / имя",phone:"Телефон",qty:"Количество",w:"Ширина сцены",d:"Глубина сцены",h:"Высота сцены"};
+function conflictLabel(path){var labels={title:"Название мероприятия",date:"Дата мероприятия",mountDate:"Монтажный день",mount:"Время монтажа",rehearsal:"Прогоны",rehearsalDay:"День прогонов",start:"Начало мероприятия",end:"Завершение",status:"Статус",manager:"Менеджер",padmin:"Администратор проекта",engineer:"Инженер проекта",soundchecks:"Саундчеки",time:"Время",notes:"Общие примечания",halls:"Выбранные залы",hallRoles:"Назначение залов",items:"Список оборудования и задач",note:"Примечание",staff:"Персонал",chief:"Бригадир",files:"Файлы",links:"Ссылки",docs:"Документы",spec:"Параметры сцены",name:"Название / имя",phone:"Телефон",qty:"Количество",w:"Ширина сцены",d:"Глубина сцены",h:"Высота сцены"};
  var parts=[];path.forEach(function(k){var hall=hallById(k),cat=CATS.filter(function(c){return c.id===k})[0];if(hall)parts.push(hall.name);else if(cat)parts.push(cat.name);else if(labels[k])parts.push(labels[k])});return parts.join(" · ")||"Данные мероприятия";
 }
 function readableValue(v){if(v===undefined||v===null||v==="")return "Убрано / не заполнено";if(Array.isArray(v))return v.length?v.map(function(x){return typeof x==="object"?readableValue(x):String(x)}).join("\n\n"):"Список пуст";if(typeof v==="object")return Object.keys(v).filter(function(k){return ["id","path","uploadedAt","uploading"].indexOf(k)<0}).map(function(k){var label={role:"Роль",url:"Ссылка",size:"Размер файла (байт)"}[k]||conflictLabel([k]);return label+": "+readableValue(v[k])}).join("\n");return String(v)}
@@ -817,6 +818,7 @@ function blk(ev,h,c){var b=ev&&ev.blocks&&ev.blocks[h]&&ev.blocks[h][c];return b
 function byId(arr){var m={};(arr||[]).forEach(function(x){if(x&&x.id)m[x.id]=x});return m}
 function computeDiff(o,n){
  var out={head:[],cats:{},marks:{},mk:{},total:0};
+ if(JSON.stringify((o.soundchecks||[]).filter(function(x){return x.name||x.date||x.time}))!==JSON.stringify((n.soundchecks||[]).filter(function(x){return x.name||x.date||x.time}))){out.head.push("Саундчеки: расписание изменено");out.total++}
  var add=function(k,t){(out.cats[k]=out.cats[k]||[]).push(t);out.total++};
  [["title","Название"],["mountDate","Монтажный день"],["date","Проведение мероприятия"],["mount","Монтаж с"],["rehearsal","Прогоны / репетиции"],["rehearsalDay","Прогоны"],["start","Начало"],["end","Завершение"],["status","Статус"],["manager","Менеджер проекта"],["padmin","Администратор проекта"],["engineer","Инженер проекта"],["notes","Примечания"]].forEach(function(f){
   var a=(o[f[0]]||"").trim?String(o[f[0]]||"").trim():"",b=String(n[f[0]]||"").trim();if(a===b)return;
@@ -911,6 +913,15 @@ function factList(ev){
  if((ev.engineer||"").trim())rows.push(["Инженер проекта",ev.engineer.trim(),"txt"]);
  return '<dl class="flist">'+rows.map(function(r){return '<div class="frow'+(r[0]==="Прогоны / репетиции с"?" rehearsal":r[0]==="Начало мероприятия"?" event-start":"")+'"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';
 }
+function soundchecksView(ev,isEdit){
+ var list=Array.isArray(ev.soundchecks)?ev.soundchecks:[];
+ if(!isEdit)list=list.filter(function(x){return x&&(x.name||x.date||x.time)});
+ if(!isEdit&&!list.length)return "";
+ return '<section class="soundchecks"><h3>Саундчеки</h3><div class="soundcheck-list">'+list.map(function(x,i){
+  if(!isEdit)return '<div class="soundcheck-read"><b>'+esc(x.name||"Группа не указана")+'</b><span>'+esc(x.date?fmtDate(x.date,{day:"numeric",month:"long",year:"numeric"}):"Дата не указана")+'</span><strong class="mono">'+esc(x.time||"Время не указано")+'</strong></div>';
+  return '<div class="soundcheck-edit">'+[["name","Название группы","text"],["date","Дата","date"],["time","Время","time"]].map(function(f){return '<label><span class="eyebrow">'+f[1]+'</span><input id="sc-'+i+'-'+f[0]+'" type="'+f[2]+'" data-f="soundcheck" data-i="'+i+'" data-k="'+f[0]+'" value="'+esc(x[f[0]]||"")+'"></label>'}).join("")+'<button type="button" class="btn sm" data-act="soundcheck-remove" data-i="'+i+'" aria-label="Удалить саундчек '+(i+1)+'">×</button></div>';
+ }).join("")+'</div>'+(isEdit?'<button type="button" class="btn sm" data-act="soundcheck-add">+ Добавить группу</button>':'')+'</section>';
+}
 function factCell(label,key,val,type,isEdit,extra){
  if(isEdit)return '<label class="fact"><span class="eyebrow">'+label+'</span><input id="f-'+key+'" type="'+type+'" data-f="'+key+'" value="'+esc(val||"")+'">'+(key==="rehearsal"&&editing&&editing.mountDate?'<span class="fact-act seg-mini"><button type="button" class="linkbtn'+(editing.rehearsalDay!=="mount"?" on":"")+'" data-act="reh-day" data-v="">в день мероприятия</button><button type="button" class="linkbtn'+(editing.rehearsalDay==="mount"?" on":"")+'" data-act="reh-day" data-v="mount">в монтажный день</button></span>':'')+(key==="mountDate"?'<span class="fact-act"><button type="button" class="linkbtn" data-act="mount-eve">накануне</button>'+(val?' · <button type="button" class="linkbtn" data-act="mount-clear">очистить</button>':'')+'</span>':'')+'</label>';
  return '<div class="fact"><span class="eyebrow">'+label+'</span><span class="v'+(extra||"")+(val?"":" dim")+'">'+(val?esc(type==="date"?fmtDate(val,{day:"numeric",month:"long",year:"numeric"}):val):"—")+'</span>'+(type==="date"&&val?'<span class="eyebrow">'+esc(fmtDate(val,{weekday:"long"}))+'</span>':'')+'</div>';
@@ -929,6 +940,7 @@ function headView(ev,isEdit){
   factCell("Прогоны / репетиции с","rehearsal",ev.rehearsal,"time",isEdit)+
   (showStart?factCell("Начало мероприятия","start",ev.start,"time",isEdit):"")+
   factCell("Завершение","end",ev.end,"time",isEdit)+'</div>';
+ h+=soundchecksView(ev,isEdit);
  h+='<div class="halls-row"><span class="eyebrow">'+(halls.length>1?"Залы":"Зал")+'</span><div class="chips">';
  if(isEdit){
   h+=halls.map(function(x){return '<span class="hall-chip">'+esc(x.name)+'<button class="btn ghost sm" style="padding:0 2px" data-act="unhall" data-h="'+x.id+'" aria-label="Убрать зал '+esc(x.name)+'"><span class="x">×</span></button></span>'}).join("");
@@ -1141,7 +1153,7 @@ function render(){
 
 /* ---------- events ---------- */
 function newEvent(status){return {id:uid(),title:"",date:"",mount:"",rehearsal:"",start:"",end:"",status:status||"draft",halls:[],notes:"",blocks:{},_new:true}}
-function startEdit(ev){if(editing&&dirty&&editing.id!==ev.id&&!persistDraft())return false;if(drafts()[ev.id]){modal={t:"recover",id:ev.id};render();return false}editingBase=clone(ev);editingOrig=allPaths(ev);editing=clone(ev);editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing);return true}
+function startEdit(ev){if(editing&&dirty&&editing.id!==ev.id&&!persistDraft())return false;if(drafts()[ev.id]){modal={t:"recover",id:ev.id};render();return false}editingBase=clone(ev);editingOrig=allPaths(ev);editing=clone(ev);if(!Array.isArray(editing.soundchecks))editing.soundchecks=[{name:"",date:"",time:""},{name:"",date:"",time:""}];editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing);return true}
 function leaveEdit(keepDraft){
  if(keepDraft&&dirty&&!persistDraft())return false;
  if(!keepDraft&&editing){dropDraft(editing.id);if(editing._uploaded)removeFiles(editing._uploaded,editing.id,true)}
@@ -1260,6 +1272,8 @@ app.addEventListener("click",function(e){
   case "me-cancel":pendingCheck=null;modal=null;render();break;
   case "mount-eve":if(editing){if(!editing.date){toast("Сначала укажите дату проведения");break}var md=new Date(editing.date+"T00:00:00");md.setDate(md.getDate()-1);editing.mountDate=md.getFullYear()+"-"+String(md.getMonth()+1).padStart(2,"0")+"-"+String(md.getDate()).padStart(2,"0");dirty=true;render()}break;
   case "mount-clear":if(editing){editing.mountDate="";editing.rehearsalDay="";dirty=true;render()}break;
+  case "soundcheck-add":if(editing){editing.soundchecks=editing.soundchecks||[];editing.soundchecks.push({name:"",date:"",time:""});dirty=true;render();var scInput=document.getElementById("sc-"+(editing.soundchecks.length-1)+"-name");if(scInput)scInput.focus({preventScroll:true})}break;
+  case "soundcheck-remove":if(editing&&editing.soundchecks){editing.soundchecks.splice(+d.i,1);dirty=true;render()}break;
   case "reh-day":if(editing){editing.rehearsalDay=d.v||"";dirty=true;render()}break;
   case "close":case "close-bg":var returnToVersion=modal&&modal.t==="releases";pendingCheck=null;modal=null;render();if(returnToVersion){var vb=document.getElementById("app-version");if(vb)vb.focus()}break;
  }
@@ -1307,7 +1321,8 @@ app.addEventListener("input",function(e){
  var t=e.target,d=t.dataset;
  if(modal?.t==="account"){if(t.id==="profile-last")modal.last=t.value;if(t.id==="profile-first")modal.first=t.value}
  if(d.f&&editing){
-  if(d.f==="item"){editing.blocks[d.h][d.c].items[+d.i][d.k]=t.value}
+  if(d.f==="soundcheck"){if(editing.soundchecks&&editing.soundchecks[+d.i]&&["name","date","time"].indexOf(d.k)>=0)editing.soundchecks[+d.i][d.k]=t.value}
+  else if(d.f==="item"){editing.blocks[d.h][d.c].items[+d.i][d.k]=t.value}
   else if(d.f==="link"){editing.blocks[d.h][d.c].links[+d.i][d.k]=t.value}
   else if(d.f==="staff"){editing.blocks[d.h][d.c].staff[+d.i][d.k]=t.value}
   else if(d.f==="hallrole"){editing.hallRoles=editing.hallRoles||{};editing.hallRoles[d.h]=t.value}
