@@ -11,18 +11,31 @@ async function boot(admin,deleted=false,telegram=false,done=[]){
   constructor(){this.filters=[];this.op='read';this.single=false}
   select(){return this}eq(k,v){this.filters.push([k,v]);return this}neq(){return this}order(){return this}maybeSingle(){this.single=true;return this}insert(p){this.op='insert';this.p=p;return this}
   then(a,b){return Promise.resolve().then(()=>{let data=table==='events'?rows:table==='settings'?[{id:1,data:{halls:[{id:'h',name:'Main'}]},updated_at:'stamp'}]:[{email:'admin@example.com'}];if(this.op==='insert'){const r={...this.p,version:1,updated_at:'2026-11-01T00:00:00Z'};rows.push(r);data=[r]}else data=data.filter(r=>this.filters.every(([k,v])=>r[k]===v));return {data:this.single?(data[0]||null):JSON.parse(JSON.stringify(data))}}).then(a,b)}
- }},channel(){return {on(){return this},subscribe(){return this}}},removeChannel(){},storage:{from:()=>({getPublicUrl:()=>({data:{publicUrl:'https://example.test/file'}})})}};
+ }},channel(){return {on(){return this},subscribe(){return this}}},removeChannel(){},storage:{from:()=>({upload:async()=>({error:null}),getPublicUrl:()=>({data:{publicUrl:'https://example.test/file'}})})}};
  const location={hash:admin?'':'#ev-E',pathname:'/',search:'',origin:'https://example.test'};
  let hashValue=location.hash;Object.defineProperty(location,'hash',{get:()=>hashValue,set:v=>{hashValue=v?(String(v).startsWith('#')?String(v):'#'+v):''}});
  const nodes={app,toast:{},saving:{}};
  const document={title:'ТЗ',activeElement:null,hidden:false,cookie:'',documentElement:{getAttribute:()=>null,setAttribute(){}},getElementById:id=>nodes[id]||null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
  const c={console,JSON,Date,Promise,crypto:require('node:crypto').webcrypto,document,location,history:{replaceState(a,b,url){location.hash=url.includes('#')?'#'+url.split('#')[1]:''},pushState(a,b,url){location.hash=url.includes('#')?'#'+url.split('#')[1]:''}},localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},sessionStorage:{getItem:()=>null,setItem(){}},navigator:{},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,supabase:{createClient:()=>sb},TZ_CONFIG:{url:'https://example.test',key:'public',telegram},innerWidth:1200,scrollY:0,scrollTo(){},addEventListener:(n,f)=>(winListeners[n]??=[]).push(f)};c.window=c;
- vm.createContext(c);vm.runInContext(source,c);await tick();await tick();
+ vm.createContext(c);vm.runInContext(source.replace(/\}\)\(\);?\s*$/, 'window.__test={renewChangedTasks,specTasks,hallProgress,cleanEvent};})();'),c);await tick();await tick();
  const click=(act,dataset={})=>{for(const f of listeners.click||[])f({target:{closest:()=>({getAttribute:()=>act,dataset,tagName:'BUTTON'})},preventDefault(){}})};
  const hash=()=>{for(const f of winListeners.hashchange||[])f()};
  return {c,app,click,hash,store,listeners,rows};
 }
 (async()=>{
+ const multi=await boot(true);multi.click('new',{st:'draft'});multi.hash();
+ for(const f of multi.listeners.change)f({target:{dataset:{hallpick:'h'},checked:true}});
+ multi.click('stage-add',{h:'h'});multi.click('stage-add',{h:'h'});
+ const setSpec=(si,k,value)=>{for(const f of multi.listeners.input)f({target:{dataset:{f:'spec',h:'h',c:'stage',si,k},value}})};
+ setSpec('-1','w','8');setSpec('-1','name','Main');setSpec('0','w','4');setSpec('0','location','Near entrance');setSpec('0','name','Extra');
+ multi.click('stage-remove',{h:'h',i:'1'});
+ for(const f of multi.listeners.change)f({target:{dataset:{upload:'h|h'},files:[{name:'hall.pdf',size:12,type:'application/pdf'}],value:''}});
+ await tick();await tick();multi.click('save');await tick();await tick();
+ const multiSaved=multi.rows.find(r=>r.id!=='E');assert.equal(multiSaved.data.blocks.h.stage.stages.length,1);assert.equal(multiSaved.data.blocks.h.stage.spec.w,'8');assert.equal(multiSaved.data.blocks.h.stage.stages[0].location,'Near entrance');assert.equal(multiSaved.data.hallFiles.h[0].name,'hall.pdf');
+ const base=JSON.parse(JSON.stringify(multiSaved.data)),changed=JSON.parse(JSON.stringify(base));changed.blocks.h.stage.stages[0].w='5';multi.c.__test.renewChangedTasks(changed,base);assert.notEqual(changed.blocks.h.stage.stages[0].id,base.blocks.h.stage.stages[0].id);assert.equal(changed.blocks.h.stage.spec.id,base.blocks.h.stage.spec.id);assert.equal(multi.c.__test.specTasks(base.blocks.h.stage).length,2);assert.equal(multi.c.__test.hallProgress(base,'h').total,2);
+ assert.match(multi.app.innerHTML,/Near entrance/);assert.match(multi.app.innerHTML,/hall.pdf/);assert.match(multi.app.innerHTML,new RegExp(multiSaved.data.blocks.h.stage.stages[0].id+':size'));
+ const noFiles=await boot(false);assert.ok(!noFiles.app.innerHTML.includes('Схемы зала'));
+
  const sc=await boot(true);sc.click('new',{st:'draft'});sc.hash();
  assert.match(sc.app.innerHTML,/sc-1-name/);
  for(const [k,value] of [['name','Band <One>'],['date','2026-12-01'],['time','14:30']])for(const f of sc.listeners.input)f({target:{dataset:{f:'soundcheck',i:'0',k},value}});
@@ -74,4 +87,5 @@ async function boot(admin,deleted=false,telegram=false,done=[]){
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);
  console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, first-check name prompt, hidden trash events');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
 
