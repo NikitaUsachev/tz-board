@@ -50,3 +50,9 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 
 /* Use the full header width for event details and soundchecks. */
 .event-sheet .head .flist{width:100%;max-width:none}
+
+.stage-unit{padding:14px;border:1px solid var(--line);border-left:3px solid var(--stage);background:var(--surface);display:grid;gap:10px;min-width:0}
+.stage-unit-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stage-unit-title b{font-weight:500}.stage-unit-title span{color:var(--muted);overflow-wrap:anywhere}.stage-unit-title .btn{margin-left:auto}
+.stage-add{align-self:flex-start}.hall>.plots-edit{border:1px solid var(--muted);padding:14px;background:var(--surface)}
+.stage-unit .stage-edit{border:0;padding:0;background:transparent}
