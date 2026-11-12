@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.12","date":"12 ноября 2026","title":"Несколько сцен и схемы залов","groups":[{"title":"Работа с залами","items":["В одном зале можно добавить несколько сцен с отдельными параметрами и расположением.","Схемы можно загрузить непосредственно в зал. У техников раздел виден только при наличии файлов."]}]},
 {"version":"28.11","date":"12 ноября 2026","title":"Саундчеки музыкальных групп","groups":[{"title":"Шапка ТЗ","items":["Добавлен список саундчеков: название группы, дата и время. Можно добавить несколько групп и удалить лишние строки. Заполненное расписание видно техникам."]}]},
 {"version":"28.10","date":"11 ноября 2026","title":"Проверка заполнения и стабильные отметки","groups":[{"title":"Работа с ТЗ","items":["При сохранении рабочего ТЗ и смене статуса приложение проверяет заполнение и предлагает перейти к нужному полю. Черновики можно сохранять незаполненными.","Обновление готовности зала больше не перерисовывает всю страницу. При появлении кнопки готовности сохраняется высота блока.","Уточнены начертания оборудования и монтажных примечаний."]}]},
 {"version":"28.9.2","date":"11 ноября 2026","title":"Компактный просмотр ТЗ","groups":[{"title":"Для техников","items":["Убран общий перечень изменений над ТЗ. Новые и изменённые позиции отмечаются внутри залов."]}]},
@@ -267,6 +268,8 @@ function specLines(sp){if(!sp)return [];var out=[],w=num(sp.w),d=num(sp.d),h=num
  var sf=num(sp.stepsFront),ss=num(sp.stepsSide);
  if(sf||ss)out.push(["Ступени",[sf?"фронтальные: "+sf+" шт.":"",ss?"боковые: "+ss+" шт.":""].filter(Boolean).join(" · "),"steps"]);
  return out}
+function stageSpecs(b){return (b&&b.spec?[b.spec]:[]).concat(b&&Array.isArray(b.stages)?b.stages:[])}
+function stageSummary(b){return stageSpecs(b).map(function(sp){return [sp.name,sp.location,specStr(sp)].filter(Boolean).join(" · ")}).filter(Boolean).join("\n")}
 function specStr(sp){return specLines(sp).map(function(x){return x[0]+": "+x[1]}).join("; ")}
 function blockCount(b){return b?b.items.filter(function(i){return (i.name||"").trim()}).length+(b.files||[]).filter(function(f){return f.path}).length+(b.links||[]).filter(function(l){return (l.url||"").trim()}).length:0}
 function catCount(ev,cid){var n=0;(ev.halls||[]).forEach(function(h){n+=blockCount(ev.blocks&&ev.blocks[h]&&ev.blocks[h][cid])});return n}
@@ -278,7 +281,7 @@ function isImg(f){return /^(png|jpe?g|webp|gif)$/.test(fileExt(f.name))}
 function fileUrl(f){return f.path?sb.storage.from(BUCKET).getPublicUrl(f.path).data.publicUrl:""}
 var DOCS=[{id:"tech",name:"Технический сценарий"},{id:"director",name:"Режиссёрский сценарий"},{id:"scheme",name:"Общая схема",accept:".pdf,.png,.jpg,.jpeg,.webp,.gif,.vwx,.dwg,.dxf,.mvr,.zip"}];
 var DOC_ACCEPT=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.rtf,.txt,.png,.jpg,.jpeg,.webp,.zip";
-function fileLists(ev){var out=[];if(!ev)return out;Object.keys(ev.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=ev.blocks[h][c.id];if(b&&b.files)out.push(b.files)})});DOCS.forEach(function(d){if(ev.docs&&ev.docs[d.id])out.push(ev.docs[d.id])});return out}
+function fileLists(ev){var out=[];if(!ev)return out;Object.keys(ev.hallFiles||{}).forEach(function(h){out.push(ev.hallFiles[h])});Object.keys(ev.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=ev.blocks[h][c.id];if(b&&b.files)out.push(b.files)})});DOCS.forEach(function(d){if(ev.docs&&ev.docs[d.id])out.push(ev.docs[d.id])});return out}
 function allPaths(ev){var out=[];fileLists(ev).forEach(function(l){l.forEach(function(f){if(f.path)out.push(f.path)})});return out}
 function pathInUse(path,exceptId){return state.events.some(function(e){return e.id!==exceptId&&allPaths(e).indexOf(path)>=0})}
 function removeFiles(paths,exceptId,temporary){if(!temporary)return;paths=(paths||[]).filter(function(p){return !pathInUse(p,exceptId)});if(paths.length)sb.storage.from(BUCKET).remove(paths).then(function(){},function(){})}
@@ -286,6 +289,7 @@ function uploading(ev){return fileLists(ev).some(function(l){return l.some(funct
 /* key: "b|hall|cat" for block files, "d|tech" for event documents */
 function listFor(key){
  if(!editing)return null;var p=key.split("|");
+ if(p[0]==="h"){editing.hallFiles=editing.hallFiles||{};return editing.hallFiles[p[1]]=editing.hallFiles[p[1]]||[]}
  if(p[0]==="b"){var b=editing.blocks[p[1]]&&editing.blocks[p[1]][p[2]];if(!b)return null;b.files=b.files||[];return b.files}
  editing.docs=editing.docs||{};editing.docs[p[1]]=editing.docs[p[1]]||[];return editing.docs[p[1]];
 }
@@ -567,7 +571,10 @@ function requestsView(){
   (rej.length?'<details class="req-rej"><summary>Отклонённые ('+rej.length+')</summary><div class="reqs">'+rej.map(function(x){return row(x,true)}).join("")+'</div></details>':'');
 }
 function loadAdmins(){return sb.from("admins").select("email").order("email").then(function(r){admins=(r.data||[]).map(function(x){return x.email})})}
-function cleanEvent(ev){var e=clone(ev);if(e.hallRoles){Object.keys(e.hallRoles).forEach(function(k){var v=String(e.hallRoles[k]||"").trim();if(!v||(e.halls||[]).indexOf(k)<0)delete e.hallRoles[k];else e.hallRoles[k]=v});if(!Object.keys(e.hallRoles).length)delete e.hallRoles}delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});var sk=Object.keys(b.spec).filter(function(k){return k!=="id"});if(!sk.length)delete b.spec;else if(!b.spec.id)b.spec.id=uid()}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
+function cleanEvent(ev){var e=clone(ev);
+ Object.keys(e.hallFiles||{}).forEach(function(h){e.hallFiles[h]=e.hallFiles[h].filter(function(f){return f.path&&!f.uploading})});
+ Object.keys(e.blocks||{}).forEach(function(h){var b=e.blocks[h].stage;if(!b)return;(b.stages||[]).forEach(function(sp){Object.keys(sp).forEach(function(k){sp[k]=String(sp[k]||"").trim();if(!sp[k])delete sp[k]});if(!sp.id)sp.id=uid()});b.stages=(b.stages||[]).filter(function(sp){return Object.keys(sp).some(function(k){return k!=="id"&&sp[k]})});});
+if(e.hallRoles){Object.keys(e.hallRoles).forEach(function(k){var v=String(e.hallRoles[k]||"").trim();if(!v||(e.halls||[]).indexOf(k)<0)delete e.hallRoles[k];else e.hallRoles[k]=v});if(!Object.keys(e.hallRoles).length)delete e.hallRoles}delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});var sk=Object.keys(b.spec).filter(function(k){return k!=="id"});if(!sk.length)delete b.spec;else if(!b.spec.id)b.spec.id=uid()}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
 function fail(e,prefix){busy=false;showSaving(false);toast((prefix||"Не удалось сохранить")+": "+((e&&e.message)||"ошибка сети"));return false}
 
 /* Completeness review shared by editor saves and board status changes. */
@@ -659,7 +666,7 @@ function mergeChanges(base,mine,theirs,path,issues){
  issues.push({path:path,mine:copyValue(mine),theirs:copyValue(theirs)});return copyValue(mine);
 }
 function setMergedValue(obj,path,value){var p=obj;for(var i=0;i<path.length-1;i++){if(!p[path[i]])p[path[i]]={};p=p[path[i]]}if(value===undefined)delete p[path[path.length-1]];else p[path[path.length-1]]=copyValue(value)}
-function conflictLabel(path){var labels={title:"Название мероприятия",date:"Дата мероприятия",mountDate:"Монтажный день",mount:"Время монтажа",rehearsal:"Прогоны",rehearsalDay:"День прогонов",start:"Начало мероприятия",end:"Завершение",status:"Статус",manager:"Менеджер",padmin:"Администратор проекта",engineer:"Инженер проекта",soundchecks:"Саундчеки",time:"Время",notes:"Общие примечания",halls:"Выбранные залы",hallRoles:"Назначение залов",items:"Список оборудования и задач",note:"Примечание",staff:"Персонал",chief:"Бригадир",files:"Файлы",links:"Ссылки",docs:"Документы",spec:"Параметры сцены",name:"Название / имя",phone:"Телефон",qty:"Количество",w:"Ширина сцены",d:"Глубина сцены",h:"Высота сцены"};
+function conflictLabel(path){var labels={title:"Название мероприятия",date:"Дата мероприятия",mountDate:"Монтажный день",mount:"Время монтажа",rehearsal:"Прогоны",rehearsalDay:"День прогонов",start:"Начало мероприятия",end:"Завершение",status:"Статус",manager:"Менеджер",padmin:"Администратор проекта",engineer:"Инженер проекта",soundchecks:"Саундчеки",time:"Время",notes:"Общие примечания",halls:"Выбранные залы",hallRoles:"Назначение залов",items:"Список оборудования и задач",note:"Примечание",staff:"Персонал",chief:"Бригадир",files:"Файлы",links:"Ссылки",docs:"Документы",spec:"Параметры сцены",stages:"Дополнительные сцены",location:"Расположение",hallFiles:"Схемы зала",name:"Название / имя",phone:"Телефон",qty:"Количество",w:"Ширина сцены",d:"Глубина сцены",h:"Высота сцены"};
  var parts=[];path.forEach(function(k){var hall=hallById(k),cat=CATS.filter(function(c){return c.id===k})[0];if(hall)parts.push(hall.name);else if(cat)parts.push(cat.name);else if(labels[k])parts.push(labels[k])});return parts.join(" · ")||"Данные мероприятия";
 }
 function readableValue(v){if(v===undefined||v===null||v==="")return "Убрано / не заполнено";if(Array.isArray(v))return v.length?v.map(function(x){return typeof x==="object"?readableValue(x):String(x)}).join("\n\n"):"Список пуст";if(typeof v==="object")return Object.keys(v).filter(function(k){return ["id","path","uploadedAt","uploading"].indexOf(k)<0}).map(function(k){var label={role:"Роль",url:"Ссылка",size:"Размер файла (байт)"}[k]||conflictLabel([k]);return label+": "+readableValue(v[k])}).join("\n");return String(v)}
@@ -824,6 +831,7 @@ function computeDiff(o,n){
   var a=(o[f[0]]||"").trim?String(o[f[0]]||"").trim():"",b=String(n[f[0]]||"").trim();if(a===b)return;
   var v=f[0]==="rehearsalDay"?(b==="mount"?"в монтажный день":"в день мероприятия"):(f[0]==="date"||f[0]==="mountDate")?(fmtDate(b,{day:"numeric",month:"long"})||"—"):f[0]==="status"?stName(b):f[0]==="notes"?"изменены":(b||"—");
   out.head.push(f[1]+": "+(f[0]==="notes"?v:(f[0]==="date"||f[0]==="mountDate"||f[0]==="rehearsalDay"||f[0]==="status"||!a?"":(a+" → "))+v));out.total++});
+ (n.halls||[]).forEach(function(h){var A=byId((o.hallFiles||{})[h]),B=(n.hallFiles||{})[h]||[];B.forEach(function(f){if(!A[f.id]){out.head.push("Схема зала: "+f.name);out.marks[f.id]="new";out.mk[f.id]=["hallfile|"+h,0];out.total++}});Object.keys(A).forEach(function(id){if(!B.some(function(f){return f.id===id})){out.head.push("Удалена схема зала: "+A[id].name);out.total++}})});
  (n.halls||[]).forEach(function(h){var ro=hallRole(o,h),rn=hallRole(n,h);if(ro!==rn&&(o.halls||[]).indexOf(h)>=0){var x=hallById(h);out.head.push((x?x.name:h)+": назначение — "+(rn||"убрано"));out.total++}});
  (n.halls||[]).forEach(function(h){if((o.halls||[]).indexOf(h)<0){var x=hallById(h);out.head.push("Добавлен зал: "+(x?x.name:h));out.total++}});
  (o.halls||[]).forEach(function(h){if((n.halls||[]).indexOf(h)<0){var x=hallById(h);out.head.push("Убран зал: "+(x?x.name:h));out.total++}});
@@ -836,7 +844,7 @@ function computeDiff(o,n){
    if(!p||!(p.name||"").trim()){add(k,"добавлено: "+itemLabel(it));out.marks[it.id]="new";out.mk[it.id]=[k,1]}
    else if(itemLabel(p)!==itemLabel(it)||String(p.note||"").trim()!==String(it.note||"").trim()){add(k,"изменено: "+(itemLabel(p)!==itemLabel(it)?itemLabel(p)+" → "+itemLabel(it):itemLabel(it)+" (комментарий)"));out.marks[it.id]="changed";out.mk[it.id]=[k,1]}});
   (ob.items||[]).forEach(function(it){if((it.name||"").trim()&&!(nb.items||[]).some(function(x){return x.id===it.id&&(x.name||"").trim()}))add(k,"удалено: "+itemLabel(it))});
-  if(specStr(ob.spec)!==specStr(nb.spec)){add(k,"параметры сцены: "+(specStr(nb.spec)||"очищены"));out.marks["spec|"+k]="changed";out.mk["spec|"+k]=[k,0]}
+  if(stageSummary(ob)!==stageSummary(nb)){add(k,"параметры сцены: "+(stageSummary(nb)||"очищены"));out.marks["spec|"+k]="changed";out.mk["spec|"+k]=[k,0]}
   var oc=ob.chief||{},nc=nb.chief||{};if(personLine(oc)!==personLine(nc)){add(k,"бригадир: "+(personLine(nc)||"снят"));out.marks["chief|"+k]="changed";out.mk["chief|"+k]=[k,0]}
   var SA=byId(ob.staff);staffOf(nb).forEach(function(p){var q=SA[p.id];if(!q||!personLine(q)){add(k,"в персонале: "+personLine(p));out.marks[p.id]="new";out.mk[p.id]=[k,0]}else if(personLine(q)!==personLine(p)){add(k,"персонал изменён: "+personLine(p));out.marks[p.id]="changed";out.mk[p.id]=[k,0]}});
   staffOf(ob).forEach(function(p){if(!staffOf(nb).some(function(x){return x.id===p.id}))add(k,"убран из персонала: "+personLine(p))});
@@ -982,6 +990,7 @@ window.addEventListener("resize",fitHallPicker);
 window.addEventListener("scroll",fitHallPicker);
 var HALL_ROLES=["Конференция","Пленарное заседание","Дискуссионный зал","Панельная дискуссия","Мастер-класс","Регистрация","Welcome-зона","Кофе-брейк","Банкет","Фуршет","Выставка","Пресс-зона","Бэкстейдж / гримёрка","Зона спикеров","Концерт"];
 function hallRole(ev,hid){return String(((ev&&ev.hallRoles)||{})[hid]||"").trim()}
+function hallFilesView(ev,hid,isEdit){var files=(ev.hallFiles||{})[hid];return isEdit?filesEdit(files,"Схемы зала","h|"+hid,PLOT_ACCEPT,"+ Загрузить схему","PDF, изображения, Vectorworks, DWG, MVR · до 50 МБ на файл"):filesRead(files,"Схемы зала")}
 function hallsView(ev,isEdit,depts){
  var halls=evHalls(ev);
  if(!halls.length)return '<div class="no-halls">'+(isEdit?"Выберите зал или несколько залов в шапке — для каждого появятся блоки «Звук», «Свет» и «Видео».":"Залы для этого мероприятия пока не выбраны.")+'</div>';
@@ -989,13 +998,13 @@ function hallsView(ev,isEdit,depts){
  var done=isEdit?null:checks;
  return halls.map(function(h){
   if(isEdit){var tot=CATS.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
-   return '<section class="hall" id="hall-'+h.id+'"><div class="hall-h hall-h-edit"><h3>'+esc(h.name)+'</h3><input id="hr-'+h.id+'" class="hall-role-in" data-f="hallrole" data-h="'+h.id+'" list="dl-hallroles" value="'+esc(hallRole(ev,h.id))+'" placeholder="Назначение: конференция, регистрация…" aria-label="Назначение зала '+esc(h.name)+'"><span class="eyebrow">'+tot+' поз.</span></div><div class="cats">'+
+   return '<section class="hall" id="hall-'+h.id+'"><div class="hall-h hall-h-edit"><h3>'+esc(h.name)+'</h3><input id="hr-'+h.id+'" class="hall-role-in" data-f="hallrole" data-h="'+h.id+'" list="dl-hallroles" value="'+esc(hallRole(ev,h.id))+'" placeholder="Назначение: конференция, регистрация…" aria-label="Назначение зала '+esc(h.name)+'"><span class="eyebrow">'+tot+' поз.</span></div>'+hallFilesView(ev,h.id,true)+'<div class="cats">'+
    CATS.map(function(c){return catEdit(ev,h.id,c)}).join("")+'</div></section>'}
   var cats=CATS.filter(function(c){return isGen(c.id)||depts.indexOf(c.id)>=0}),col=collapsed(ev.id),hc=!!col[h.id];
   var tot2=cats.reduce(function(n,c){return n+blockCount(ev.blocks[h.id][c.id])},0);
   var hch=cats.some(function(c){return markCount(ev,h.id+"|"+c.id)});
   return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hallRole(ev,h.id)?'<span class="hall-role">'+esc(hallRole(ev,h.id))+'</span>':'')+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
-   (hc?'':(isAdmin?'':'<div class="hall-progress">'+readyButton(ev,h)+'</div>')+'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
+   (hc?'':hallFilesView(ev,h.id,false)+(isAdmin?'':'<div class="hall-progress">'+readyButton(ev,h)+'</div>')+'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
  }).join("")+(isEdit?'':'<p class="hint me-line">Отметки «сделано» видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
 }
 function chiefRead(b,k){if(!hasChief(b))return "";var m=curMarks["chief|"+k];
@@ -1003,7 +1012,8 @@ function chiefRead(b,k){if(!hasChief(b))return "";var m=curMarks["chief|"+k];
 function staffRead(b){var st=staffOf(b);if(!st.length)return "";
  return '<div class="staff"><span class="eyebrow">Персонал</span>'+st.map(function(p){var m=curMarks[p.id];
   return '<div class="person'+(m?" mk-"+m:"")+'"><span class="p-role">'+esc(p.role||"—")+'</span><span class="p-name">'+esc(p.name||"—")+badge(p.id)+'</span>'+phoneHtml(p.phone)+'</div>'}).join("")+'</div>'}
-function specTasks(b){var sp=b&&b.spec;if(!sp||!sp.id)return [];return specLines(sp).map(function(x){return sp.id+":"+x[2]})}
+function specTasks(b){return stageSpecs(b).reduce(function(out,sp){return out.concat(sp.id?specLines(sp).map(function(x){return sp.id+":"+x[2]}):[])},[])}
+function stagesRead(b,k,evid){return stageSpecs(b).map(function(sp,i){if(!specLines(sp).length&&!sp.name&&!sp.location)return "";return '<section class="stage-unit"><div class="stage-unit-title"><b>'+esc(sp.name||("Сцена "+(i+1)))+'</b>'+(sp.location?'<span>'+esc(sp.location)+'</span>':'')+'</div>'+stageRead({spec:sp},k,evid)+'</section>'}).join("")}
 function stageRead(b,k,evid){var L=specLines(b.spec);if(!L.length)return "";var m=curMarks["spec|"+k],sid=b.spec.id;
  return '<div class="stage-spec'+(m?" mk-changed":"")+'">'+L.map(function(x){var tid=sid?sid+":"+x[2]:"",c=tid&&checks[tid];
   var inner='<span class="eyebrow">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b>'+(c?'<span class="who">✓ '+esc(shortName(c.by)||"отмечено")+(c.at?' · '+esc(fmtWhen(c.at)):'')+'</span>':'<span class="who"></span>');
@@ -1013,7 +1023,7 @@ function catRead(ev,hid,c,done,col){
  var k=hid+"|"+c.id,cc=!!col[k],n=blockCount(b),ch=markCount(ev,k);
  var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed" title="Новые и изменённые пункты">'+ch+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}).map(function(i){return {id:i.id}}).concat(specTasks(b).map(function(t){return {id:t}})),dn=its.filter(function(i){return checks[i.id]}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
  if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+'</div>';
- var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stageRead(b,k,ev.id):"";
+ var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stagesRead(b,k,ev.id):"";
  if(!items.length&&!plots&&!spec&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
   return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'<span class="who"></span>')+'</label>'}).join("")+'</div>':'')+staff+
@@ -1028,9 +1038,10 @@ function staffEdit(hid,c,b){var st=b.staff||[],at=function(i){return ' data-h="'
   '<button class="add-item" data-act="add-staff" data-h="'+hid+'" data-c="'+c.id+'">+ Человек</button></div>'}
 function chiefEdit(hid,c,b){var ch=b.chief||{},k=hid+"-"+c.id,at=' data-h="'+hid+'" data-c="'+c.id+'"';
  return '<div class="chief-e"><span class="eyebrow">Бригадир</span><input id="chn-'+k+'" data-f="chief" data-k="name"'+at+' value="'+esc(ch.name)+'" placeholder="Имя Фамилия" aria-label="Бригадир: имя"><input id="chp-'+k+'" type="tel" inputmode="tel" data-f="chief" data-k="phone"'+at+' value="'+esc(ch.phone)+'" placeholder="Телефон" aria-label="Бригадир: телефон"></div>'}
-function stageEdit(hid,b){var sp=b.spec||{},k=hid,at=function(f){return ' data-f="spec" data-h="'+hid+'" data-c="stage" data-k="'+f+'"'};
+function stagesEdit(hid,b){return [b.spec||{}].concat(b.stages||[]).map(function(sp,i){var ix=i-1;return '<section class="stage-unit"><div class="stage-unit-title"><b>Сцена '+(i+1)+'</b>'+(i?'<button type="button" class="btn sm" data-act="stage-remove" data-h="'+hid+'" data-i="'+ix+'">Удалить сцену</button>':'')+'</div>'+stageEdit(hid,{spec:sp},ix)+'</section>'}).join("")+'<button type="button" class="btn sm stage-add" data-act="stage-add" data-h="'+hid+'">+ Добавить сцену</button>'}
+function stageEdit(hid,b,index){var sp=b.spec||{},k=hid+"-"+(index==null?-1:index),at=function(f){return ' data-f="spec" data-h="'+hid+'" data-c="stage" data-si="'+(index==null?-1:index)+'" data-k="'+f+'"'};
  var numIn=function(f,lab,ph){return '<label class="se"><span class="eyebrow">'+lab+'</span><input id="sp-'+f+'-'+k+'"'+at(f)+' inputmode="decimal" value="'+esc(sp[f])+'" placeholder="'+ph+'"></label>'};
- return '<div class="stage-edit">'+numIn("w","Ширина, м","8")+numIn("d","Глубина, м","6")+numIn("h","Высота, м","0,6")+
+ return '<div class="stage-edit"><label class="se se-wide"><span class="eyebrow">Название сцены</span><input id="sp-name-'+k+'"'+at("name")+' value="'+esc(sp.name||"")+'" placeholder="Основная сцена"></label><label class="se se-wide"><span class="eyebrow">Расположение в зале</span><input id="sp-location-'+k+'"'+at("location")+' value="'+esc(sp.location||"")+'" placeholder="Например: у входа, справа"></label>'+numIn("w","Ширина, м","8")+numIn("d","Глубина, м","6")+numIn("h","Высота, м","0,6")+
   '<label class="se"><span class="eyebrow">Покрытие</span><select id="sp-cover-'+k+'"'+at("cover")+'>'+COVERS.map(function(o){return '<option value="'+esc(o)+'"'+((sp.cover||"")===o?" selected":"")+'>'+(o||"Без покрытия")+'</option>'}).join("")+'</select></label>'+
   '<label class="se se-wide"><span class="eyebrow">Покрытие: цвет / примечание</span><input id="sp-cn-'+k+'"'+at("coverNote")+' value="'+esc(sp.coverNote)+'" placeholder="Например: чёрный"></label>'+
   '<label class="se"><span class="eyebrow">Раус</span><select id="sp-raus-'+k+'"'+at("raus")+'><option value="">Нет</option><option value="yes"'+(sp.raus==="yes"?" selected":"")+'>Есть</option></select></label>'+
@@ -1038,7 +1049,7 @@ function stageEdit(hid,b){var sp=b.spec||{},k=hid,at=function(f){return ' data-f
   numIn("stepsFront","Ступени фронт., шт","0")+numIn("stepsSide","Ступени бок., шт","0")+'</div>'}
 function catEdit(ev,hid,c){
  var b=ev.blocks[hid][c.id];
- return '<div class="cat cat-'+c.id+'"><div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span></div>'+chiefEdit(hid,c,b)+(c.id==="stage"?stageEdit(hid,b):"")+(c.id==="light"?plotsEdit(ev,hid,c,b):c.id==="video"?linksEdit(hid,c,b):'')+'<div class="rows">'+
+ return '<div class="cat cat-'+c.id+'"><div class="cat-h"><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span></div>'+chiefEdit(hid,c,b)+(c.id==="stage"?stagesEdit(hid,b):"")+(c.id==="light"?plotsEdit(ev,hid,c,b):c.id==="video"?linksEdit(hid,c,b):'')+'<div class="rows">'+
   b.items.map(function(it,i){var k=hid+"-"+c.id+"-"+it.id;
    var last=b.items.length-1,at=' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"';
    return '<div class="erow" data-erow="'+hid+'|'+c.id+'|'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="n-'+k+'" data-f="item" data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'" data-k="name" list="dl-'+c.id+'" value="'+esc(it.name)+'" placeholder="Оборудование / задача" aria-label="Позиция">'+
@@ -1173,6 +1184,7 @@ function renewChangedTasks(ev,base){
   (b.items||[]).forEach(function(it){var prev=(old.items||[]).filter(function(x){return x.id===it.id})[0];
    if(prev&&["name","qty","note"].some(function(k){return String(prev[k]||"").trim()!==String(it[k]||"").trim()}))it.id=uid();
   });
+  (b.stages||[]).forEach(function(sp){var prev=(old.stages||[]).find(function(x){return x.id===sp.id});if(prev&&!sameValue(sp,prev))sp.id=uid()});
   if(b.spec&&old.spec&&b.spec.id===old.spec.id){var a=clone(b.spec),o=clone(old.spec);delete a.id;delete o.id;
    var keys=Object.keys(a).concat(Object.keys(o));if(keys.some(function(k){return String(a[k]||"").trim()!==String(o[k]||"").trim()}))b.spec.id=uid();
   }
@@ -1272,6 +1284,8 @@ app.addEventListener("click",function(e){
   case "me-cancel":pendingCheck=null;modal=null;render();break;
   case "mount-eve":if(editing){if(!editing.date){toast("Сначала укажите дату проведения");break}var md=new Date(editing.date+"T00:00:00");md.setDate(md.getDate()-1);editing.mountDate=md.getFullYear()+"-"+String(md.getMonth()+1).padStart(2,"0")+"-"+String(md.getDate()).padStart(2,"0");dirty=true;render()}break;
   case "mount-clear":if(editing){editing.mountDate="";editing.rehearsalDay="";dirty=true;render()}break;
+  case "stage-add":if(editing){var stageBlock=editing.blocks[d.h].stage;stageBlock.stages=stageBlock.stages||[];stageBlock.stages.push({id:uid()});dirty=true;render()}break;
+  case "stage-remove":if(editing){editing.blocks[d.h].stage.stages.splice(+d.i,1);dirty=true;render()}break;
   case "soundcheck-add":if(editing){editing.soundchecks=editing.soundchecks||[];editing.soundchecks.push({name:"",date:"",time:""});dirty=true;render();var scInput=document.getElementById("sc-"+(editing.soundchecks.length-1)+"-name");if(scInput)scInput.focus({preventScroll:true})}break;
   case "soundcheck-remove":if(editing&&editing.soundchecks){editing.soundchecks.splice(+d.i,1);dirty=true;render()}break;
   case "reh-day":if(editing){editing.rehearsalDay=d.v||"";dirty=true;render()}break;
@@ -1326,7 +1340,7 @@ app.addEventListener("input",function(e){
   else if(d.f==="link"){editing.blocks[d.h][d.c].links[+d.i][d.k]=t.value}
   else if(d.f==="staff"){editing.blocks[d.h][d.c].staff[+d.i][d.k]=t.value}
   else if(d.f==="hallrole"){editing.hallRoles=editing.hallRoles||{};editing.hallRoles[d.h]=t.value}
-  else if(d.f==="spec"){var sbb=editing.blocks[d.h][d.c];sbb.spec=sbb.spec||{};sbb.spec[d.k]=t.value}
+  else if(d.f==="spec"){var sbb=editing.blocks[d.h][d.c];var targetSpec;if(d.si!=null&&+d.si>=0){targetSpec=(sbb.stages||[])[+d.si]}else{targetSpec=sbb.spec=sbb.spec||{}}if(targetSpec)targetSpec[d.k]=t.value}
   else if(d.f==="chief"){var cb=editing.blocks[d.h][d.c];cb.chief=cb.chief||{name:"",phone:""};cb.chief[d.k]=t.value}
   else if(d.f==="cnote"){editing.blocks[d.h][d.c].note=t.value}
   else editing[d.f]=t.value;
