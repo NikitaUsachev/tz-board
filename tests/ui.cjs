@@ -23,6 +23,15 @@ async function boot(admin,deleted=false,telegram=false,done=[]){
  return {c,app,click,hash,store,listeners,rows};
 }
 (async()=>{
+ const sc=await boot(true);sc.click('new',{st:'draft'});sc.hash();
+ assert.match(sc.app.innerHTML,/sc-1-name/);
+ for(const [k,value] of [['name','Band <One>'],['date','2026-12-01'],['time','14:30']])for(const f of sc.listeners.input)f({target:{dataset:{f:'soundcheck',i:'0',k},value}});
+ sc.click('soundcheck-add');assert.match(sc.app.innerHTML,/sc-2-name/);
+ sc.click('soundcheck-remove',{i:'1'});assert.ok(!sc.app.innerHTML.includes('sc-2-name'));
+ sc.click('save');await tick();await tick();
+ const savedSC=sc.rows.find(r=>r.id!=='E');assert.equal(savedSC.data.soundchecks[0].name,'Band <One>');assert.equal(savedSC.data.soundchecks[0].time,'14:30');
+ assert.match(sc.app.innerHTML,/Band &lt;One&gt;/);assert.match(sc.app.innerHTML,/14:30/);assert.ok(!sc.app.innerHTML.includes('Группа не указана'));
+
  const a=await boot(true);assert.match(a.app.innerHTML,/Версия \d+\.\d+/);assert.match(a.app.innerHTML,/Корзина/);
  assert.match(a.app.innerHTML,/version-link has-update/);a.click('releases');assert.ok(!a.app.innerHTML.includes('version-link has-update'));a.click('close');a.click('new',{st:'draft'});a.hash();
  for(const f of a.listeners.input)f({target:{dataset:{f:'title'},value:'My draft'}});

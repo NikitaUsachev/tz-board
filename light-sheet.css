@@ -31,3 +31,17 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 .completeness-list{margin:0;padding-left:20px;display:grid;gap:14px}
 .completeness-list .linkbtn{text-align:left}
 .completeness-list .hint{display:block;margin-top:4px}
+
+/* Multiple band soundchecks in the event header. */
+.soundchecks{display:grid;gap:12px}
+.soundchecks h3{margin:0;font-size:18px;font-weight:500}
+.soundchecks>.btn{justify-self:start}
+.soundcheck-list{display:grid;gap:10px}
+.soundcheck-edit{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+.soundcheck-edit label{display:grid;gap:4px;min-width:0}
+.soundcheck-edit input{width:100%;min-width:0;max-width:100%;padding:9px;border:1px solid var(--line);border-radius:4px;background:var(--surface);font-size:16px}
+.soundcheck-edit .btn{min-width:40px;min-height:40px}
+.soundcheck-read{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;padding:10px 0;border-bottom:1px solid var(--line)}
+.soundcheck-read b{flex:1 1 220px;font-weight:500;overflow-wrap:anywhere}
+.soundcheck-read strong{font-weight:500}
+@media(max-width:560px){.soundcheck-edit{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}.soundcheck-edit label:first-child{grid-column:1/3}.soundcheck-edit .btn{grid-column:3;grid-row:1}.soundcheck-read b{flex-basis:100%}}
