@@ -56,3 +56,31 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 .stage-unit-title b{font-weight:500}.stage-unit-title span{color:var(--muted);overflow-wrap:anywhere}.stage-unit-title .btn{margin-left:auto}
 .stage-add{align-self:flex-start}.hall>.plots-edit{border:1px solid var(--muted);padding:14px;background:var(--surface)}
 .stage-unit .stage-edit{border:0;padding:0;background:transparent}
+
+
+/* 28.13: approved compact event layout. */
+.event-sheet .head{padding:24px;gap:16px;background:var(--surface-2);border-top:4px solid var(--hero)}
+.event-sheet .head h2{font-size:clamp(26px,3.2vw,40px);line-height:1.15;max-width:100%;font-weight:400}
+.ux-panel,.soundchecks{padding:16px 20px;background:var(--surface);border:1px solid var(--line);border-radius:4px;width:100%}
+.soundchecks{border-left:4px solid var(--cue)}
+.ux-panel h3,.soundchecks h3{font-size:17px;font-weight:500;margin:0 0 8px;letter-spacing:-.02em}
+.ux-panel .flist{border-top:0}
+.frow{padding:10px 0}
+.frow:last-child{border-bottom:0}
+.ux-contacts summary{cursor:pointer;font-size:16px;font-weight:500;min-height:28px}
+.ux-contacts[open] summary{margin-bottom:10px}
+.head>.halls-row:has(.notes){padding:14px 16px;border-left:4px solid var(--cue);background:var(--surface)}
+.plots{border:1px solid var(--line);border-radius:4px;background:var(--surface);padding:14px 16px}
+.plot-img{display:none}
+.plot{display:flex;align-items:center;flex-wrap:wrap;gap:10px;border:0;padding:8px 0}
+.plot-row{flex:1;min-width:160px}
+.plot-act{margin:0}
+.row{min-height:48px;padding:12px 0;grid-template-columns:28px minmax(0,1fr) auto}
+.row input{width:22px;height:22px}
+.stage-unit{padding:16px;border-radius:4px}
+.row:has(input:disabled){opacity:.65}
+@media(max-width:560px){.event-sheet .head{padding:18px 14px}.ux-panel,.soundchecks{padding:14px}.frow{gap:10px}.frow dt{flex:1;min-width:0}.frow dd{flex:1}.top-in .brand h1{font-size:15px}}
+
+/* Hidden save overlay must not intercept subsequent interactions. */
+.saving[hidden]{display:none!important}
+
