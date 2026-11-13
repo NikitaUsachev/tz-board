@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version": "28.13", "date": "13 ноября 2026", "title": "Более компактное и удобное ТЗ", "groups": [{"title": "Оформление и навигация", "items": ["Шапка стала компактнее: расписание собрано в отдельном блоке, а команда проекта раскрывается по нажатию.", "Саундчеки и сцены оформлены в едином стиле. Файлы отображаются компактными строками с кнопками открытия и скачивания.", "Увеличена область нажатия на отметки задач. При обновлении страницы ТЗ лучше сохраняется положение видимого блока."]}]},
 {"version":"28.12","date":"12 ноября 2026","title":"Несколько сцен и схемы залов","groups":[{"title":"Работа с залами","items":["В одном зале можно добавить несколько сцен с отдельными параметрами и расположением.","Схемы можно загрузить непосредственно в зал. У техников раздел виден только при наличии файлов."]}]},
 {"version":"28.11","date":"12 ноября 2026","title":"Саундчеки музыкальных групп","groups":[{"title":"Шапка ТЗ","items":["Добавлен список саундчеков: название группы, дата и время. Можно добавить несколько групп и удалить лишние строки. Заполненное расписание видно техникам."]}]},
 {"version":"28.10","date":"11 ноября 2026","title":"Проверка заполнения и стабильные отметки","groups":[{"title":"Работа с ТЗ","items":["При сохранении рабочего ТЗ и смене статуса приложение проверяет заполнение и предлагает перейти к нужному полю. Черновики можно сохранять незаполненными.","Обновление готовности зала больше не перерисовывает всю страницу. При появлении кнопки готовности сохраняется высота блока.","Уточнены начертания оборудования и монтажных примечаний."]}]},
@@ -916,10 +917,12 @@ function factList(ev){
  rows.push(["Прогоны / репетиции с",ev.rehearsal?(rm?dl(ev.mountDate)+" · "+ev.rehearsal:ev.rehearsal):(rm?dl(ev.mountDate):""),rm?"txt":""]);
  if(ev.start)rows.push(["Начало мероприятия",ev.start,""]);
  rows.push(["Завершение",ev.end||"",""]);
+ var scheduleCount=rows.length;
  rows.push(["Менеджер проекта",mg,"txt"]);
  if(pa)rows.push(["Администратор проекта",pa,"txt"]);
  if((ev.engineer||"").trim())rows.push(["Инженер проекта",ev.engineer.trim(),"txt"]);
- return '<dl class="flist">'+rows.map(function(r){return '<div class="frow'+(r[0]==="Прогоны / репетиции с"?" rehearsal":r[0]==="Начало мероприятия"?" event-start":"")+'"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';
+ function list(items){return '<dl class="flist">'+items.map(function(r){return '<div class="frow'+(r[0]==="Прогоны / репетиции с"?" rehearsal":r[0]==="Начало мероприятия"?" event-start":"")+'"><dt>'+r[0]+'</dt><dd class="'+(r[2]==="txt"?"t":"m")+(r[1]?"":" dim")+'">'+(r[1]?esc(r[1]):(r[0]==="Менеджер проекта"?"Не указан":"—"))+'</dd></div>'}).join("")+'</dl>';}
+ return '<section class="ux-panel"><h3>Расписание мероприятия</h3>'+list(rows.slice(0,scheduleCount))+'</section><details class="ux-panel ux-contacts"><summary>Команда проекта</summary>'+list(rows.slice(scheduleCount))+'</details>';
 }
 function soundchecksView(ev,isEdit){
  var list=Array.isArray(ev.soundchecks)?ev.soundchecks:[];
@@ -1140,6 +1143,10 @@ function render(){
  var focusedHall=oldOptions&&oldOptions.contains(document.activeElement)?document.activeElement.dataset.hallpick:null;
  var id=route();
  var y=window.scrollY;
+ var uxAnchor=Array.from(document.querySelectorAll('.row,.stage-unit,.cat-h,.hall-h')).find(function(n){var r=n.getBoundingClientRect();return r.top>=180&&r.top<window.innerHeight});
+ var uxKey=uxAnchor&&(uxAnchor.querySelector('[data-done]')?.dataset.done||uxAnchor.dataset.k);
+ var uxTop=uxAnchor&&uxAnchor.getBoundingClientRect().top;
+ var uxContacts=!!document.querySelector('.ux-contacts[open]');
  var active=document.activeElement, aid=active&&active.id, sel=null;
  try{if(aid&&active.selectionStart!=null)sel=[active.selectionStart,active.selectionEnd]}catch(_){}
  var body;
@@ -1150,7 +1157,9 @@ function render(){
  app.classList.toggle("admin-layout",isAdmin&&!id);
  if(editing&&dirty)persistDraft();
  app.innerHTML=body+(isAdmin&&!editing?adminFooter():"")+(isAdmin?datalists():'')+modalView();
+ if(uxContacts){var ct=document.querySelector('.ux-contacts');if(ct)ct.open=true}
  window.scrollTo(0,y);
+ if(uxKey){var candidate=Array.from(document.querySelectorAll('[data-done],[data-k]')).find(function(n){return n.dataset.done===uxKey||n.dataset.k===uxKey});if(candidate){var anchor=candidate.closest('.row,.stage-unit,.cat-h,.hall-h');if(anchor)window.scrollBy(0,anchor.getBoundingClientRect().top-uxTop)}}
  if(pickerOpen){
   fitHallPicker();
   var options=document.querySelector(".hall-options");
@@ -1415,6 +1424,7 @@ sb.auth.onAuthStateChange(function(ev,s){
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&!editing&&authReady)scheduleReload()});
 setInterval(function(){if(authReady&&!isAdmin&&route()&&!document.hidden)loadTech(route())},60000);
 })();
+
 
 
 
