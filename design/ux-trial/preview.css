@@ -1,0 +1,22 @@
+/* Preview only. Shared sizes and accents; production CSS is unchanged. */
+body:not(.original) .event-sheet .head{padding:24px;gap:16px;background:var(--surface-2);border-top:4px solid var(--hero)}
+body:not(.original) .event-sheet .head h2{font-size:clamp(26px,3.2vw,40px);line-height:1.15;max-width:100%;font-weight:400}
+body:not(.original) .ux-panel,body:not(.original) .soundchecks{padding:16px 20px;background:var(--surface);border:1px solid var(--line);border-radius:4px;width:100%}
+body:not(.original) .soundchecks{border-left:4px solid var(--cue)}
+body:not(.original) .ux-panel h3,body:not(.original) .soundchecks h3{font-size:17px;font-weight:500;margin:0 0 8px;letter-spacing:-.02em}
+body:not(.original) .ux-panel .flist{border-top:0}
+body:not(.original) .frow{padding:10px 0}
+body:not(.original) .frow:last-child{border-bottom:0}
+body:not(.original) .ux-contacts summary{cursor:pointer;font-size:16px;font-weight:500;min-height:28px}
+body:not(.original) .ux-contacts[open] summary{margin-bottom:10px}
+body:not(.original) .head>.halls-row:has(.notes){padding:14px 16px;border-left:4px solid var(--cue);background:var(--surface)}
+body:not(.original) .plots{border:1px solid var(--line);border-radius:4px;background:var(--surface);padding:14px 16px}
+body:not(.original) .plot-img{display:none}
+body:not(.original) .plot{display:flex;align-items:center;flex-wrap:wrap;gap:10px;border:0;padding:8px 0}
+body:not(.original) .plot-row{flex:1;min-width:160px}
+body:not(.original) .plot-act{margin:0}
+body:not(.original) .row{min-height:48px;padding:12px 0;grid-template-columns:28px minmax(0,1fr) auto}
+body:not(.original) .row input{width:22px;height:22px}
+body:not(.original) .stage-unit{padding:16px;border-radius:4px}
+body:not(.original) .row:has(input:disabled){opacity:.65}
+@media(max-width:560px){body:not(.original) .event-sheet .head{padding:18px 14px}body:not(.original) .ux-panel,body:not(.original) .soundchecks{padding:14px}body:not(.original) .frow{gap:10px}body:not(.original) .frow dt{flex:1;min-width:0}body:not(.original) .frow dd{flex:1}body:not(.original) .top-in .brand h1{font-size:15px}}

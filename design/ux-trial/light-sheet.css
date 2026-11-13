@@ -1,0 +1,59 @@
+/* Light Sheet: shared palette and editorial surfaces across all routes. */
+body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b5d;--line:#c6c9c6;--hero:#b5dafa;--accent:#1c3849;--accent-ink:#fff;--accent-soft:#dbeafa;--cue:#ff955f;--card-fill:var(--surface);--card-edge:var(--hero)}
+:root[data-theme=dark] body{--bg:#171c20;--surface:#20272b;--surface-2:#293136;--ink:#edf2f4;--muted:#bac5c9;--line:#49555a;--hero:#29465b;--accent:#b5dafa;--accent-ink:#142433;--accent-soft:#2d4150}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) body{--bg:#171c20;--surface:#20272b;--surface-2:#293136;--ink:#edf2f4;--muted:#bac5c9;--line:#49555a;--hero:#29465b;--accent:#b5dafa;--accent-ink:#142433;--accent-soft:#2d4150}}
+.top,.editbar,.admin-footer{background:var(--bg);border-color:var(--line)}
+.admin-layout .brand{padding-left:0;border:0}.brand h1,.auth-brand h1,.dlg h2,.card h3,.hall-h h3,.col-h h2{font-weight:400;letter-spacing:-.035em}
+.col{background:transparent;border:0;border-radius:0;padding:0}.col-h{border-radius:0;padding:14px;background:var(--hero)}.col .card{background:var(--surface);border:0;border-top:1px solid var(--line);border-left:4px solid var(--card-edge);border-radius:0;box-shadow:none}.col .card h3{font-size:1.2rem}
+.event-sheet .head{border-radius:0;padding:clamp(20px,4vw,44px);background:var(--hero)}.event-sheet .head::after{inset:16px 16px auto auto;width:15px;height:15px;background:none;border-top:2px solid;border-right:2px solid}.event-sheet .head h2{font-weight:300;font-size:clamp(32px,5vw,64px);letter-spacing:-.05em}.head .facts,.head .flist{border-radius:0}.fact:has(#f-rehearsal)>.eyebrow:first-child,.frow.rehearsal dd:not(.dim){background:var(--cue);color:#262019;padding:2px 7px}
+.event-sheet .seg button,.btn,.pop{border-radius:4px}.hall-h{border-bottom:1px solid var(--line)}.event-sheet .cat:has(input:not([type=checkbox])){background:transparent;padding:14px 0}.event-sheet .row{border-radius:0;border-inline:0;background:transparent;box-shadow:none}.event-sheet .erow{border-radius:0}
+.auth-card,.dlg{border:1px solid var(--line);border-radius:4px;background:var(--surface)}.dlg h2,.auth-brand{border-radius:0;background:var(--hero);padding:16px}.editbar{border-top:1px solid var(--line)}
+
+/* Document uploads in the event editor. */
+.docs .plots-edit{border:2px solid var(--muted);background:var(--surface);border-radius:4px}
+.docs .plots-edit:focus-within{border-color:var(--accent)}
+
+.frow.event-start dd:not(.dim),.fact:has(#f-start)>.eyebrow:first-child{background:#b5dafa;color:#142433;padding:2px 7px;outline:1px solid #789bb2}
+
+.sheet-navigation{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex:1 0 100%;padding-top:6px;border-top:1px solid var(--line)}
+.sheet-navigation select{flex:0 1 260px;width:260px;min-width:0;max-width:100%;font-size:16px}
+.sheet-navigation .btn{flex:none}
+@media(max-width:560px){.sheet-navigation select{flex:1;width:auto;max-width:none}}
+@media print{.sheet-navigation{display:none}}
+
+
+/* Stable checklist geometry and readable working text. */
+.event-sheet{overflow-anchor:none}
+.event-sheet .row .nm,.event-sheet .erow input,.event-sheet .cat-note,.event-sheet .row .cm{font-weight:400}
+.event-sheet .row .q{font-weight:500;font-variant-numeric:tabular-nums}
+.event-sheet .cat-h b{font-weight:500}
+.event-sheet .row .cm,.event-sheet .cat-note{color:var(--muted);line-height:1.5}
+.completeness-list{margin:0;padding-left:20px;display:grid;gap:14px}
+.completeness-list .linkbtn{text-align:left}
+.completeness-list .hint{display:block;margin-top:4px}
+
+/* Multiple band soundchecks in the event header. */
+.soundchecks{display:grid;gap:0;width:100%;max-width:none;min-width:0;border:1px solid var(--muted);border-left:4px solid var(--cue);border-radius:4px;background:var(--surface);padding:16px 18px}
+.soundchecks h3{margin:0 0 4px;font-size:16px;font-weight:500;letter-spacing:-.025em}
+.soundchecks>.btn{justify-self:start;margin-top:14px}
+.soundcheck-list{display:grid;gap:0;min-width:0}
+.soundcheck-edit{padding:12px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+.soundcheck-edit label{display:grid;gap:4px;min-width:0}
+.soundcheck-edit input{width:100%;min-width:0;max-width:100%;padding:9px;border:1px solid var(--line);border-radius:4px;background:var(--surface);font-size:16px}
+.soundcheck-edit .btn{min-width:40px;min-height:40px}
+.soundcheck-read{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px 16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.soundcheck-read:last-child,.soundcheck-edit:last-child{border-bottom:0;padding-bottom:0}
+.soundcheck-read>span{font-size:14px;color:var(--muted)}
+.soundcheck-read b{min-width:0;font-size:15px;font-weight:500;overflow-wrap:anywhere}
+.soundcheck-read strong{justify-self:end;font-size:15px;font-weight:500;background:var(--cue);color:#262019;padding:3px 8px;border-radius:2px}
+@media(max-width:560px){.soundcheck-edit{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}.soundcheck-edit label:first-child{grid-column:1/3}.soundcheck-edit .btn{grid-column:3;grid-row:1}.soundchecks{padding:14px}.soundcheck-read{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}.soundcheck-read b{grid-column:1;grid-row:1}.soundcheck-read>span{grid-column:1;grid-row:2;font-size:13px}.soundcheck-read strong{grid-column:2;grid-row:1/3;max-width:130px}}
+
+/* Use the full header width for event details and soundchecks. */
+.event-sheet .head .flist{width:100%;max-width:none}
+
+.stage-unit{padding:14px;border:1px solid var(--line);border-left:3px solid var(--stage);background:var(--surface);display:grid;gap:10px;min-width:0}
+.stage-unit-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stage-unit-title b{font-weight:500}.stage-unit-title span{color:var(--muted);overflow-wrap:anywhere}.stage-unit-title .btn{margin-left:auto}
+.stage-add{align-self:flex-start}.hall>.plots-edit{border:1px solid var(--muted);padding:14px;background:var(--surface)}
+.stage-unit .stage-edit{border:0;padding:0;background:transparent}
+
