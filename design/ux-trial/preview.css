@@ -20,3 +20,6 @@ body:not(.original) .row input{width:22px;height:22px}
 body:not(.original) .stage-unit{padding:16px;border-radius:4px}
 body:not(.original) .row:has(input:disabled){opacity:.65}
 @media(max-width:560px){body:not(.original) .event-sheet .head{padding:18px 14px}body:not(.original) .ux-panel,body:not(.original) .soundchecks{padding:14px}body:not(.original) .frow{gap:10px}body:not(.original) .frow dt{flex:1;min-width:0}body:not(.original) .frow dd{flex:1}body:not(.original) .top-in .brand h1{font-size:15px}}
+
+/* Hidden save overlay must not intercept subsequent interactions. */
+.saving[hidden]{display:none!important}
