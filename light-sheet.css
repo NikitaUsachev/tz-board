@@ -84,3 +84,22 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 /* Hidden save overlay must not intercept subsequent interactions. */
 .saving[hidden]{display:none!important}
 
+
+/* 28.14: people are visually distinct from equipment and tasks. */
+.event-sheet .staff:not(.staff-edit),.event-sheet .chief{
+ padding:14px 16px;border:1px solid color-mix(in srgb,var(--hero) 60%,var(--line));
+ border-left:3px solid #7eafd5;border-radius:4px;
+ background:color-mix(in srgb,var(--accent-soft) 45%,var(--surface));
+ min-width:0;
+}
+.event-sheet .staff:not(.staff-edit){gap:8px}
+.event-sheet .staff:not(.staff-edit)>.eyebrow,.event-sheet .chief>.eyebrow{color:var(--muted)}
+.event-sheet .staff:not(.staff-edit) .person{padding:6px 0}
+.event-sheet .staff:not(.staff-edit) .person+.person{border-top:1px solid var(--line);padding-top:10px}
+.event-sheet .person .p-name,.event-sheet .chief>b{font-weight:600;overflow-wrap:anywhere;min-width:0}
+.event-sheet .chief.mk-changed{border-color:var(--warn)}
+@media(max-width:560px){
+ .event-sheet .staff:not(.staff-edit),.event-sheet .chief{padding:12px}
+ .event-sheet .person{grid-template-columns:minmax(0,1fr)}
+ .event-sheet .person .tel{justify-self:start}
+}
