@@ -14,13 +14,14 @@ var SUGGEST={
 };
 
 var sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:"implicit"}});
-var state={halls:[],events:[]}, versions={}, loaded=false, loadError="";
+var legacyHalls=[], state={halls:[],events:[]}, versions={}, loaded=false, loadError="";
 var session=null, isAdmin=false, admins=[], authReady=false, techMsg="", auth={tab:"in",email:"",msg:"",err:"",busy:false}, rtChannel=null;
 var editingBase=null, settingsData={}, settingsStamp=null, allRequest=0, techRequest=0, authRequest=0;
 var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pickerOpen=false, modal=null, exitArmed=false, delArmed=false, conflict=null, busy=false;
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.15","date":"16 ноября 2026","title":"Личный список залов","groups":[{"title":"Для администраторов","items":["В настройках у каждого администратора свой список залов. Можно добавлять, переименовывать и удалять залы, не меняя списки коллег.","В сохранённых ТЗ остаются свои названия и состав залов. Коллеги могут редактировать общие мероприятия со всеми их залами."]}]},
 {"version":"28.14","date":"14 ноября 2026","title":"Персонал и бригадиры заметнее в ТЗ","groups":[{"title":"Оформление","items":["Персонал и бригадиры выделены мягкой голубой подложкой и линией слева во всех отделах.","Имена выделены жирным шрифтом. Оформление адаптировано для светлой и тёмной тем."]}]},
 {"version": "28.13", "date": "13 ноября 2026", "title": "Более компактное и удобное ТЗ", "groups": [{"title": "Оформление и навигация", "items": ["Шапка стала компактнее: расписание собрано в отдельном блоке, а команда проекта раскрывается по нажатию.", "Саундчеки и сцены оформлены в едином стиле. Файлы отображаются компактными строками с кнопками открытия и скачивания.", "Увеличена область нажатия на отметки задач. При обновлении страницы ТЗ лучше сохраняется положение видимого блока."]}]},
 {"version":"28.12","date":"12 ноября 2026","title":"Несколько сцен и схемы залов","groups":[{"title":"Работа с залами","items":["В одном зале можно добавить несколько сцен с отдельными параметрами и расположением.","Схемы можно загрузить непосредственно в зал. У техников раздел виден только при наличии файлов."]}]},
@@ -249,10 +250,18 @@ function applyTheme(t){document.documentElement.setAttribute("data-theme",t);var
 if(mq){var onMq=function(){if(!ls.get("tz-theme"))render()};if(mq.addEventListener)mq.addEventListener("change",onMq);else if(mq.addListener)mq.addListener(onMq)}
 function themeBtn(){var d=curTheme()==="dark";return '<button class="btn ghost sm theme-btn" data-act="theme" aria-label="'+(d?"Включить светлую тему":"Включить тёмную тему")+'" title="'+(d?"Светлая тема":"Тёмная тема")+'"><span class="ic" aria-hidden="true">'+(d?"☀":"☾")+'</span><span class="lbl">'+(d?"Светлая":"Тёмная")+'</span></button>'}
 
-function hallById(id){for(var i=0;i<state.halls.length;i++)if(state.halls[i].id===id)return state.halls[i];return null}
+function hallById(id,ev){
+ ev=ev||editing||evById(route());
+ if(ev&&ev.hallNames&&ev.hallNames[id])return {id:id,name:ev.hallNames[id]};
+ var list=ev&&!ev._new?legacyHalls.concat(state.halls):state.halls.concat(legacyHalls);
+ for(var i=0;i<list.length;i++)if(list[i].id===id)return list[i];
+ return null;
+}
+function snapshotHalls(ev){ev.hallNames=ev.hallNames||{};(ev.halls||[]).forEach(function(id){if(!ev.hallNames[id]){var h=hallById(id,ev);ev.hallNames[id]=h?h.name:id}});return ev}
+function pickerHalls(ev){var selected=evHalls(ev),ids=selected.map(function(h){return h.id});return selected.concat(state.halls.filter(function(h){return ids.indexOf(h.id)<0}))}
 function evById(id){for(var i=0;i<state.events.length;i++)if(state.events[i].id===id)return state.events[i];return null}
 function stName(id){for(var i=0;i<STATUSES.length;i++)if(STATUSES[i].id===id)return STATUSES[i].name;return id}
-function evHalls(ev){return state.halls.filter(function(h){return (ev.halls||[]).indexOf(h.id)>=0})}
+function evHalls(ev){return (ev.halls||[]).map(function(id){return hallById(id,ev)||{id:id,name:id}})}
 function emptyBlocks(){var b={};CATS.forEach(function(c){b[c.id]={items:[],note:""}});return b}
 function ensureBlocks(ev){ev.blocks=ev.blocks||{};(ev.halls||[]).forEach(function(h){if(!ev.blocks[h])ev.blocks[h]=emptyBlocks();CATS.forEach(function(c){if(!ev.blocks[h][c.id])ev.blocks[h][c.id]={items:[],note:""}})});return ev}
 var ROLES={sound:["Звукорежиссёр","Дежурный по звуку","Монтажник звука","Техник по радиосистемам"],light:["Художник по свету","Дежурный по свету","Оператор пульта","Монтажник света"],video:["Видеоинженер","Дежурный по видео","Оператор камеры","Монтажник видео"],extra:["Электрик","Риггер","Монтажник","Дежурный электрик"],stage:["Монтажник сцены","Бригада монтажа","Декоратор"]};
@@ -387,13 +396,16 @@ function loadAll(){
  var request=++allRequest,who=myEmail();
  return Promise.all([
   sb.from("settings").select("data,updated_at").eq("id",1).maybeSingle(),
-  sb.from("events").select("id,data,version,updated_at,updated_by")
+  sb.from("events").select("id,data,version,updated_at,updated_by"),
+  sb.from("admin_hall_settings").select("data,updated_at").eq("user_id",session.user.id).maybeSingle()
  ]).then(function(r){
   if(request!==allRequest||!isAdmin||who!==myEmail())return;
   if(r[0].error)throw r[0].error;
   if(r[1].error)throw r[1].error;
-  settingsData=clone((r[0].data&&r[0].data.data)||{});settingsStamp=r[0].data?r[0].data.updated_at:null;
-  state.halls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
+  if(r[2].error)throw r[2].error;
+  legacyHalls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
+  settingsData=clone((r[2].data&&r[2].data.data)||{halls:[]});settingsStamp=r[2].data?r[2].data.updated_at:null;
+  state.halls=settingsData.halls||[];
   versions={};
   state.events=(r[1].data||[]).map(function(row){var e=row.data||{};e.id=row.id;e.updatedAt=Date.parse(row.updated_at)||0;e.updatedBy=row.updated_by||"";versions[row.id]=row.version;return e});
   loaded=true;loadError="";render();
@@ -466,7 +478,7 @@ function loadTech(id){
   if(request!==techRequest||route()!==id||isAdmin)return;
   if(r[0].error)throw r[0].error;
   if(r[1].error)throw r[1].error;
-  state.halls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];
+  legacyHalls=(r[0].data&&r[0].data.data&&r[0].data.data.halls)||[];state.halls=[];
   var row=(r[1].data||[])[0],prevV=versions[id];if(row&&row.data&&row.data.deletedAt)row=null;versions={};
   state.events=row?[(function(){var e=row.data||{};e.id=row.id;e.updatedAt=Date.parse(row.updated_at)||0;versions[row.id]=row.version;return e})()]:[];
   if(row)refreshTelegram(id,request);
@@ -552,7 +564,7 @@ function checkAdmin(){
   authReady=true;loaded=false;
   if(isAdmin){subscribe();return Promise.all([loadAll(),loadAdmins(),loadRequests()]).then(render)}
   if(session)sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()});
-  unsubscribe();admins=[];state.events=[];versions={};editing=null;
+  unsubscribe();admins=[];state.events=[];state.halls=[];legacyHalls=[];settingsData={};settingsStamp=null;versions={};editing=null;modal=null;
   if(route())return loadTech(route());
   loaded=true;render();
  });
@@ -573,7 +585,7 @@ function requestsView(){
   (rej.length?'<details class="req-rej"><summary>Отклонённые ('+rej.length+')</summary><div class="reqs">'+rej.map(function(x){return row(x,true)}).join("")+'</div></details>':'');
 }
 function loadAdmins(){return sb.from("admins").select("email").order("email").then(function(r){admins=(r.data||[]).map(function(x){return x.email})})}
-function cleanEvent(ev){var e=clone(ev);
+function cleanEvent(ev){var e=snapshotHalls(clone(ev));
  Object.keys(e.hallFiles||{}).forEach(function(h){e.hallFiles[h]=e.hallFiles[h].filter(function(f){return f.path&&!f.uploading})});
  Object.keys(e.blocks||{}).forEach(function(h){var b=e.blocks[h].stage;if(!b)return;(b.stages||[]).forEach(function(sp){Object.keys(sp).forEach(function(k){sp[k]=String(sp[k]||"").trim();if(!sp[k])delete sp[k]});if(!sp.id)sp.id=uid()});b.stages=(b.stages||[]).filter(function(sp){return Object.keys(sp).some(function(k){return k!=="id"&&sp[k]})});});
 if(e.hallRoles){Object.keys(e.hallRoles).forEach(function(k){var v=String(e.hallRoles[k]||"").trim();if(!v||(e.halls||[]).indexOf(k)<0)delete e.hallRoles[k];else e.hallRoles[k]=v});if(!Object.keys(e.hallRoles).length)delete e.hallRoles}delete e._new;delete e._uploaded;delete e.updatedAt;delete e.updatedBy;Object.keys(e.blocks||{}).forEach(function(h){CATS.forEach(function(c){var b=e.blocks[h][c.id];if(b&&b.files)b.files=b.files.filter(function(f){return f.path&&!f.uploading});if(b&&b.staff){b.staff=b.staff.filter(function(p){return (p.name||"").trim()||(p.role||"").trim()});b.staff.forEach(function(p){p.role=(p.role||"").trim();p.name=(p.name||"").trim();p.phone=(p.phone||"").trim()})}if(b&&b.spec){Object.keys(b.spec).forEach(function(k){b.spec[k]=String(b.spec[k]||"").trim();if(!b.spec[k])delete b.spec[k]});var sk=Object.keys(b.spec).filter(function(k){return k!=="id"});if(!sk.length)delete b.spec;else if(!b.spec.id)b.spec.id=uid()}if(b&&b.chief){b.chief={name:(b.chief.name||"").trim(),phone:(b.chief.phone||"").trim()};if(!b.chief.name&&!b.chief.phone)delete b.chief}if(b&&b.links){b.links=b.links.filter(function(l){return (l.url||"").trim()});b.links.forEach(function(l){l.url=normUrl(l.url);l.title=(l.title||"").trim()})}})});if(e.docs)DOCS.forEach(function(d){if(e.docs[d.id])e.docs[d.id]=e.docs[d.id].filter(function(f){return f.path&&!f.uploading})});return e}
@@ -589,7 +601,7 @@ function eventIssues(ev){
  if(!(ev.start||"").trim())add("Не указано время начала","f-start",false);
  if(!(ev.engineer||"").trim())add("Не указан инженер проекта","f-engineer",false);
  (ev.halls||[]).forEach(function(hid){
-  var hall=hallById(hid);
+  var hall=hallById(hid,ev);
   CATS.forEach(function(cat){
    var block=ev.blocks&&ev.blocks[hid]&&ev.blocks[hid][cat.id];
    (block&&block.items||[]).forEach(function(item){
@@ -636,15 +648,16 @@ function saveHalls(halls){
  if(busy||!isAdmin)return Promise.resolve(false);
  var owner=modal,base=owner&&owner.settingsBase||settingsData;
  var data=clone(base);data.halls=halls;busy=true;showSaving(true);
- var q=sb.from("settings");
- q=owner&&owner.settingsExists?q.update({data:data}).eq("id",1).eq("data",JSON.stringify(base)):q.insert({id:1,data:data});
- return q.select("id,data,updated_at").then(function(r){
+ var account=session.user.id;var q=sb.from("admin_hall_settings");
+ q=owner&&owner.settingsExists?q.update({data:data,updated_at:new Date().toISOString()}).eq("user_id",account).eq("data",JSON.stringify(base)):q.insert({user_id:account,data:data});
+ return q.select("user_id,data,updated_at").then(function(r){
+  if(!session||session.user.id!==account){busy=false;showSaving(false);return false}
   busy=false;showSaving(false);
   if(r.error)return fail(r.error);
-  if(!r.data||!r.data.length){toast("Настройки изменены другим администратором. Закройте окно и откройте заново; ваши поля пока сохранены.");return loadAll().then(function(){return false})}
+  if(!r.data||!r.data.length){toast("Ваш список изменён в другой вкладке или на другом устройстве. Закройте настройки и откройте заново; ваши поля пока сохранены.");return loadAll().then(function(){return false})}
   settingsData=clone(data);settingsStamp=r.data[0].updated_at;state.halls=halls;
   if(modal===owner){owner.settingsBase=clone(data);owner.settingsExists=true}
-  toast("Настройки сохранены");render();return true;
+  toast("Мои залы сохранены");render();return true;
  },function(e){return fail(e)});
 }
 
@@ -974,8 +987,8 @@ function headView(ev,isEdit){
 }
 function pickerPop(ev){
  var sel=ev.halls||[];
- return '<div class="pop" role="dialog" aria-label="Выбор залов"><div class="hall-options">'+(state.halls.length?state.halls.map(function(h){return '<label><input type="checkbox" data-hallpick="'+h.id+'"'+(sel.indexOf(h.id)>=0?" checked":"")+'>'+esc(h.name)+'</label>'}).join(""):'<p class="hint" style="padding:8px">Список залов пуст</p>')+
-  '</div><hr><button class="btn ghost sm" data-act="settings">Изменить список залов</button><button class="btn sm primary" data-act="picker">Готово</button></div>';
+ return '<div class="pop" role="dialog" aria-label="Выбор залов"><div class="hall-options">'+(pickerHalls(ev).length?pickerHalls(ev).map(function(h){return '<label><input type="checkbox" data-hallpick="'+h.id+'"'+(sel.indexOf(h.id)>=0?" checked":"")+'>'+esc(h.name)+'</label>'}).join(""):'<p class="hint" style="padding:8px">Список залов пуст</p>')+
+  '</div><hr><button class="btn ghost sm" data-act="settings">Изменить мои залы</button><button class="btn sm primary" data-act="picker">Готово</button></div>';
 }
 function fitHallPicker(){
  if(!pickerOpen)return;
@@ -1093,12 +1106,12 @@ function modalView(){
  if(modal.t==="settings"){
   var hs=modal.halls;
   return wrap('<h2>Настройки</h2>'+
-   '<h4>Залы</h4><div style="display:flex;flex-direction:column;gap:6px">'+hs.map(function(h,i){var used=state.events.filter(function(e){return (e.halls||[]).indexOf(h.id)>=0}).length;
+   '<h4>Мои залы</h4><div style="display:flex;flex-direction:column;gap:6px">'+hs.map(function(h,i){var used=state.events.filter(function(e){return (e.halls||[]).indexOf(h.id)>=0}).length;
     return '<div class="hl hrow" data-hrow="'+i+'"><span class="grip" draggable="true" title="Перетащите, чтобы переместить" aria-hidden="true">⋮⋮</span><input id="hall-'+h.id+'" data-hallname="'+i+'" value="'+esc(h.name)+'" aria-label="Название зала">'+
      '<span class="mv"><button data-act="mv-hall" data-i="'+i+'" data-to="'+(i-1)+'"'+(i===0?" disabled":"")+' aria-label="Переместить выше" title="Выше">↑</button><button data-act="mv-hall" data-i="'+i+'" data-to="'+(i+1)+'"'+(i===hs.length-1?" disabled":"")+' aria-label="Переместить ниже" title="Ниже">↓</button></span>'+
      '<button class="btn ghost sm danger" data-act="rm-hall" data-i="'+i+'" aria-label="Удалить зал">×</button></div>'}).join("")+
    '</div><button class="btn sm" data-act="add-hall" style="align-self:flex-start">+ Добавить зал</button>'+
-   '<p class="hint">Переименование зала обновит его во всех ТЗ. Если удалить зал, его блоки скроются из ТЗ.</p>'+
+   '<p class="hint">Этот список виден только вам при выборе залов. Изменение названий и удаление из списка не затрагивают уже созданные ТЗ.</p>'+
    '<div class="bar"><span class="sp"></span><button class="btn primary" data-act="save-settings">Сохранить залы</button></div>'+
    requestsView()+'<h4>Администраторы</h4><div style="display:flex;flex-direction:column;gap:6px">'+admins.map(function(a){var me=a.toLowerCase()===myEmail().toLowerCase();
     return '<div class="hl"><span style="flex:1;min-width:0;overflow-wrap:anywhere">'+esc(a)+'</span>'+(me?'<span class="use">это вы</span>':'<button class="btn ghost sm danger" data-act="rm-admin" data-email="'+esc(a)+'" aria-label="Убрать администратора">×</button>')+'</div>'}).join("")+'</div>'+
@@ -1174,7 +1187,7 @@ function render(){
 
 /* ---------- events ---------- */
 function newEvent(status){return {id:uid(),title:"",date:"",mount:"",rehearsal:"",start:"",end:"",status:status||"draft",halls:[],notes:"",blocks:{},_new:true}}
-function startEdit(ev){if(editing&&dirty&&editing.id!==ev.id&&!persistDraft())return false;if(drafts()[ev.id]){modal={t:"recover",id:ev.id};render();return false}editingBase=clone(ev);editingOrig=allPaths(ev);editing=clone(ev);if(!Array.isArray(editing.soundchecks))editing.soundchecks=[{name:"",date:"",time:""},{name:"",date:"",time:""}];editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing);return true}
+function startEdit(ev){if(editing&&dirty&&editing.id!==ev.id&&!persistDraft())return false;if(drafts()[ev.id]){modal={t:"recover",id:ev.id};render();return false}editingBase=clone(ev);editingOrig=allPaths(ev);editing=snapshotHalls(clone(ev));if(!Array.isArray(editing.soundchecks))editing.soundchecks=[{name:"",date:"",time:""},{name:"",date:"",time:""}];editingVersion=versions[ev.id]||null;dirty=false;exitArmed=false;pickerOpen=false;delArmed=false;conflict=null;ensureBlocks(editing);return true}
 function leaveEdit(keepDraft){
  if(keepDraft&&dirty&&!persistDraft())return false;
  if(!keepDraft&&editing){dropDraft(editing.id);if(editing._uploaded)removeFiles(editing._uploaded,editing.id,true)}
@@ -1284,7 +1297,7 @@ app.addEventListener("click",function(e){
   case "req-accept":decideRequest(d.email,true);break;
   case "req-reject":decideRequest(d.email,false);break;
   case "add-hall":modal.halls.push({id:"h"+uid(),name:"Новый зал"});render();var ins=document.querySelectorAll("[data-hallname]");if(ins.length){ins[ins.length-1].focus();ins[ins.length-1].select()}break;
-  case "rm-hall":var hid=modal.halls[+d.i].id;if(state.events.some(function(ev){return (ev.halls||[]).indexOf(hid)>=0})){toast("Зал используется в ТЗ. Сначала уберите его из мероприятий.");break}modal.halls.splice(+d.i,1);render();break;
+  case "rm-hall":modal.halls.splice(+d.i,1);render();break;
   case "mv-hall":moveHall(+d.i,+d.to);var hb=document.querySelector('[data-act="mv-hall"][data-i="'+d.to+'"][data-to="'+(2*(+d.to)-(+d.i))+'"]');if(hb&&!hb.disabled)hb.focus();break;
   case "save-settings":var halls=modal.halls.filter(function(h){return h.name.trim()}).map(function(h){return {id:h.id,name:h.name.trim()}});
    saveHalls(halls).then(function(ok){if(ok&&modal)modal.halls=clone(state.halls);render()});break;
@@ -1363,7 +1376,7 @@ app.addEventListener("input",function(e){
 app.addEventListener("change",function(e){
  var t=e.target,d=t.dataset;
  if(t.id==="hall-navigation"&&t.value){var targetHall=t.value;t.value="";jumpToHall(targetHall);return}
- if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
+ if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.hallNames=editing.hallNames||{};var picked=state.halls.filter(function(h){return h.id===id})[0];if(picked&&!editing.hallNames[id])editing.hallNames[id]=picked.name;editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
  if(d.done){var p=d.done.split("|");if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30)}else setCheck(p[0],p[1],t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
  if(d.upload&&editing&&t.files&&t.files.length){uploadFiles(d.upload,t.files);t.value=""}
