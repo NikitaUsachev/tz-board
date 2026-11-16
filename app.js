@@ -564,7 +564,7 @@ function checkAdmin(){
   authReady=true;loaded=false;
   if(isAdmin){subscribe();return Promise.all([loadAll(),loadAdmins(),loadRequests()]).then(render)}
   if(session)sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()});
-  unsubscribe();admins=[];state.events=[];state.halls=[];legacyHalls=[];settingsData={};settingsStamp=null;versions={};editing=null;modal=null;
+  unsubscribe();admins=[];state.events=[];state.halls=[];legacyHalls=[];settingsData={};settingsStamp=null;versions={};editing=null;if(modal&&modal.t==="settings")modal=null;
   if(route())return loadTech(route());
   loaded=true;render();
  });
