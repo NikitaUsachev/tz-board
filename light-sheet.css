@@ -119,3 +119,20 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 .item-phase:focus-within{outline:2px solid var(--cue);outline-offset:2px}
 .item-phase:has(input:disabled){opacity:.65;cursor:wait}
 @media(max-width:480px){.item-phases{grid-template-columns:1fr;gap:6px}.item-phase{min-height:60px}.equipment-title{font-size:15px}.equipment-title>span{max-width:50%;flex-shrink:1;text-align:right}}
+
+/* File cards: keep metadata and actions inside narrow document columns. */
+.docs{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));min-width:0}
+.plots{min-width:0;box-sizing:border-box}.plots-h{overflow-wrap:anywhere}
+.plots .plot{width:100%;box-sizing:border-box;flex-direction:column;align-items:stretch;padding:10px}
+.plot-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:8px;flex:none;min-width:0;width:100%;box-sizing:border-box}
+.plot-row .plot-ext{grid-column:1;grid-row:1;align-self:start}
+.plot-row .plot-name{grid-column:2/4;grid-row:1;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+.plot-row .chg{grid-column:1/3;grid-row:2;justify-self:start;margin:0}
+.plot-row .plot-size{grid-column:3;grid-row:2;white-space:nowrap;align-self:center}
+.plot-act{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;gap:8px}
+.plot-act .btn{min-width:0;min-height:44px;box-sizing:border-box;justify-content:center;padding-inline:8px;text-align:center}
+.plot-erow{display:grid;grid-template-columns:max-content minmax(0,1fr) 28px;min-width:0}
+.plot-erow .plot-ext{grid-column:1;grid-row:1;align-self:start}
+.plot-erow .plot-name{grid-column:2/4;grid-row:1;white-space:normal;overflow-wrap:anywhere}
+.plot-erow .plot-size{grid-column:1/3;grid-row:2;min-width:0}
+.plot-erow .rm{grid-column:3;grid-row:2}
