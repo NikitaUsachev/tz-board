@@ -31,7 +31,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  await mounted.check();await page.waitForFunction(()=>document.querySelectorAll('.block-check input:disabled').length===0);
  await present.uncheck();await page.waitForFunction(()=>document.querySelectorAll('.block-check input:disabled').length===0);
  assert.equal(await mounted.isChecked(),true);
- await page.evaluate(()=>window.failNext=true);await present.check();await page.waitForFunction(()=>document.querySelectorAll('.block-check input:disabled').length===0);assert.equal(await present.isChecked(),false);
+ await page.evaluate(()=>window.failNext=true);await present.click();await page.waitForFunction(()=>document.querySelectorAll('.block-check input:disabled').length===0);assert.equal(await present.isChecked(),false);
  for(const width of [375,768,1440]){
  await page.setViewportSize({width,height:900});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Horizontal overflow '+width);
