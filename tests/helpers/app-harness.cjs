@@ -1,0 +1,26 @@
+// Runs the complete script with a minimal DOM and API model; no live requests.
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../../app.js'),'utf8');
+const tick=()=>new Promise(setImmediate);
+async function boot(admin,deleted=false,telegram=false,done=[],options={}){
+ const listeners={},winListeners={},store=new Map(Object.entries(options.storage||{})),rpcCalls=[],uploads=[],authCalls=[];let html='';
+ const app={classList:{toggle(){}},addEventListener:(n,f)=>(listeners[n]??=[]).push(f),get innerHTML(){return html},set innerHTML(v){html=v}};
+ const ev=options.event||{id:'E',title:'Known event',date:'2026-12-01',halls:['h'],status:'prep',blocks:{h:{sound:{items:[{id:'item',name:'Microphone',qty:'2'}],note:''}}}};if(deleted)ev.deletedAt='2026-11-01';
+ const rows=[{id:ev.id,data:ev,version:1,updated_at:'2026-11-01T00:00:00Z'}];
+ const catalogues=options.catalogues||[{user_id:'user',data:{halls:[{id:'h',name:'Main'}]},updated_at:'stamp'}];
+ const sb={auth:{getSession:async()=>({data:{session:admin?{user:{id:'user',email:'admin@example.com'}}:null}}),updateUser:async({data})=>({data:{user:{id:"user",email:"admin@example.com",user_metadata:data}}}),onAuthStateChange(f){winListeners.auth=[f]},signInWithPassword:async p=>{authCalls.push({op:'in',p});return options.authResult||{data:{}}},signUp:async p=>{authCalls.push({op:'up',p});return options.authResult||{data:{user:{identities:[{}]}}}},resetPasswordForEmail:async p=>{authCalls.push({op:'reset',p});return options.authResult||{data:{}}}},rpc:async(name,args)=>{rpcCalls.push({name,args});return ({data:name==='is_admin'?(options.role!==false):name==='get_event_v2'?rows:name==='get_checks'?done:name==='tg_event_info'?{username:'example_tz_bot',ready:{}}:[]})},from(table){return new class{
+  constructor(){this.filters=[];this.op='read';this.single=false}
+  select(){return this}eq(k,v){this.filters.push([k,v]);return this}neq(){return this}order(){return this}maybeSingle(){this.single=true;return this}insert(p){this.op='insert';this.p=p;return this}update(p){this.op='update';this.p=p;return this}
+  then(a,b){return Promise.resolve().then(()=>{let data=table==='events'?rows:table==='admin_hall_settings'?catalogues:table==='settings'?[{id:1,data:{halls:[{id:'h',name:'Main'}]},updated_at:'stamp'}]:[{email:'admin@example.com'}];if(options.failTable===table)return {error:{message:'Test database failure'}};if(this.op==='update'){data=data.filter(r=>this.filters.every(([k,v])=>k==='data'?JSON.stringify(r.data)===v:r[k]===v));data.forEach(r=>{Object.assign(r,this.p);r.version=(r.version||0)+1;r.updated_at='updated'})}else if(this.op==='insert'){const r={...this.p,version:1,updated_at:'2026-11-01T00:00:00Z'};(table==='admin_hall_settings'?catalogues:rows).push(r);data=[r]}else data=data.filter(r=>this.filters.every(([k,v])=>r[k]===v));return {data:this.single?(data[0]||null):JSON.parse(JSON.stringify(data))}}).then(a,b)}
+ }},channel(){return {on(){return this},subscribe(){return this}}},removeChannel(){},storage:{from:()=>({upload:async(path,file)=>{uploads.push({path,file});return options.uploadError?{error:{message:'Test upload failure'}}:{error:null}},getPublicUrl:()=>({data:{publicUrl:'https://example.test/file'}})})}};
+ const location={hash:admin?'':'#ev-E',pathname:'/',search:'',origin:'https://example.test'};
+ let hashValue=location.hash;Object.defineProperty(location,'hash',{get:()=>hashValue,set:v=>{hashValue=v?(String(v).startsWith('#')?String(v):'#'+v):''}});
+ const nodes={app,toast:{},saving:{}};
+ const document={title:'ТЗ',activeElement:null,hidden:false,cookie:'',documentElement:{getAttribute:()=>null,setAttribute(){}},getElementById:id=>nodes[id]||null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
+ const c={console,JSON,Date,Promise,crypto:require('node:crypto').webcrypto,document,location,history:{replaceState(a,b,url){location.hash=url.includes('#')?'#'+url.split('#')[1]:''},pushState(a,b,url){location.hash=url.includes('#')?'#'+url.split('#')[1]:''}},localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},sessionStorage:{getItem:()=>null,setItem(){}},navigator:{},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,supabase:{createClient:()=>sb},TZ_CONFIG:{url:'https://example.test',key:'public',telegram},innerWidth:1200,scrollY:0,scrollTo(){},addEventListener:(n,f)=>(winListeners[n]??=[]).push(f)};c.window=c;
+ vm.createContext(c);vm.runInContext(source.replace(/\}\)\(\);?\s*$/, 'window.__test={'+[...source.matchAll(/^(?:async )?function (\w+)\(/gm)].map(m=>m[1]).join(',')+',getEditing:()=>editing,getState:()=>state,getChecks:()=>checks};})();'),c,{filename:path.join(__dirname,'../../app.js')});await tick();await tick();
+ const click=(act,dataset={})=>{for(const f of listeners.click||[])f({target:{closest:()=>({getAttribute:()=>act,dataset,tagName:'BUTTON'})},preventDefault(){}})};
+ const hash=()=>{for(const f of winListeners.hashchange||[])f()};
+ return {c,app,click,hash,store,listeners,rows,catalogues,nodes,rpcCalls,uploads,authCalls,winListeners};
+}
+module.exports={boot,tick};

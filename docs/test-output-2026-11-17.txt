@@ -1,0 +1,101 @@
+
+> tz-board@28.16.0 test:coverage
+> node --test --test-timeout=30000 --experimental-test-coverage --test-coverage-include=app.js --test-coverage-include=supabase/functions/tz-telegram/index.ts tests/*.cjs
+
+✔ Personal catalogue is displayed and saved without altering old events (52.784171ms)
+✔ Foreign event hall retained when own catalogue is empty (19.723121ms)
+✔ Header and hall electricity uploads survive save and render independently (16.193739ms)
+✔ Removing a hall file does not remove the general file (7.423079ms)
+✔ Upload failure removes pending placeholder and permits save (6.118299ms)
+✔ Database failure appears on board instead of an empty successful board (3.240717ms)
+✔ Technician sees power files only in populated halls (3.946735ms)
+✔ XSS-like event, staff, and file text is escaped (3.893577ms)
+✔ Soundcheck date/time/name remain after clean and edit (4.755705ms)
+✔ Hall readiness includes all equipment and additional stages (3.118687ms)
+✔ Changing task note rotates task identity, reordering does not (3.703497ms)
+✔ Changing additional-stage geometry preserves main-stage identity (3.248478ms)
+✔ Same-date overlapping hall blocked, different date or hall allowed (3.877823ms)
+✔ Concurrent edits in different halls merge without conflict (5.681217ms)
+✔ Conflicting attachments require an explicit choice (2.534157ms)
+✔ Drafts exempt from completeness, published event requires title/date/hall (2.918413ms)
+✔ Empty old event format renders without optional fields (2.044447ms)
+✔ Technician route accepts department link and never shows board controls (2.908428ms)
+✔ Account button uses neutral label until profile is filled (3.043186ms)
+✔ General notes and hall purpose survive event normalization (3.58331ms)
+✔ Anonymous home offers login and registration (46.113329ms)
+✔ Invalid email rejected before API call (6.479461ms)
+✔ Empty login password rejected before API call (11.120268ms)
+✔ Login sends email/password once and displays friendly API error (25.056906ms)
+✔ Registration requires matching strong-enough passwords (4.305864ms)
+✔ Registration requests confirmation email and returns to login (5.10566ms)
+✔ Existing-account registration is handled (4.442054ms)
+✔ Reset password does not disclose whether an account exists (4.28281ms)
+✔ Signed in but unapproved user cannot see admin board (2.1279ms)
+✔ Escaping handles all HTML delimiter characters (5.069487ms)
+✔ Snapshot lists include power, hall, plot and general documents (5.502463ms)
+✔ Diff records new and removed electrical files (6.650021ms)
+✔ Diff covers staff/chief/equipment/spec/link and department files (6.165068ms)
+✔ Event normalization retains hall snapshot after personal rename (9.173904ms)
+✔ Profile normalization trims names (7.060826ms)
+✔ Stage description supports dimensions, cover, ramps and steps (3.808112ms)
+PASS: task revisions, stale event/board/auth responses, serialized checks, network rollback, settings CAS, retained shared files
+✔ tests/concurrency.cjs (278.789841ms)
+PASS: own picker, colleague halls, legacy names, snapshot stability, missing IDs
+✔ tests/personal-halls.test.cjs (234.774709ms)
+PASS: multiple uploads, separate header/hall lists, save cleanup, empty technician view, removal, file size limit
+✔ tests/power-files.test.cjs (247.537922ms)
+PASS: status success/conflict/error/network, upload ownership, hall drag guard, JS syntax
+✔ tests/regression.cjs (302.87637ms)
+PASS: independent merge, explicit field choices, no forced overwrite, concurrent delete, trash/restore, room/date checks, local draft recovery
+✔ tests/safety.cjs (294.931654ms)
+✔ Non-POST rejected before external calls (6.946748ms)
+✔ Missing bot configuration rejected (3.833589ms)
+✔ Short job secret rejected (2.707954ms)
+✔ Invalid admin ID rejected (1.511173ms)
+✔ Missing or incorrect webhook secret cannot issue commands (16.541917ms)
+✔ Unknown privileged action rejected (8.68277ms)
+✔ Setup checks bot identity before registering webhook (5.110798ms)
+✔ Setup registers webhook with derived secret (4.881019ms)
+✔ Private bot command Подписаться на акции (5.703575ms)
+✔ Private bot command Посмотреть акции (5.028737ms)
+✔ Private bot command Отписаться от акций (3.016046ms)
+✔ Private bot command /start E (2.767961ms)
+✔ Private bot command /id (1.899645ms)
+✔ Ignore invalid incoming message: group (2.155942ms)
+✔ Ignore invalid incoming message: missing text (4.464497ms)
+✔ Ignore invalid incoming message: unsafe chat ID (1.696175ms)
+✔ Ignore invalid incoming message: invalid update ID (2.960475ms)
+✔ Non-admin chat never gets admin flag (1.822581ms)
+✔ RPC failure returns retryable generic response without secrets (2.105067ms)
+✔ Dispatch requires correct webhook (1.898683ms)
+✔ Dispatch acknowledgement and retry code 200 (3.05951ms)
+✔ Dispatch acknowledgement and retry code 403 (2.410716ms)
+✔ Dispatch acknowledgement and retry code 429 (1.84979ms)
+✔ Dispatch acknowledgement and retry code 500 (2.202831ms)
+✔ Shop messages include subscription keyboard (4.868721ms)
+✔ Dispatch caps work at 25 jobs (14.75227ms)
+PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, first-check name prompt, hidden trash events
+✔ tests/ui.cjs (230.132876ms)
+PASS: draft exemption, required fields, optional warnings, quantity field targeting
+✔ tests/usability.cjs (115.301679ms)
+ℹ tests 69
+ℹ suites 0
+ℹ pass 69
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 494.120776
+ℹ start of coverage report
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ file           | line % | branch % | funcs % | uncovered lines
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ app.js         |  85.43 |    68.29 |   71.86 | 249 259 343 347-350 355-356 365 429-431 461-472 499-500 507-513 517-518 521-525 534 538-550 553 577-580 595 611 627-629 633-636 638-649 686-690 725-736 742-760 766-769 776-781 796-798 838 880-881 883 889-892 894 992-1009 1055-1057 1075-1079 1104-1105 1126 1182-1188 1201-1206 1238-1239 1268-1269 1271 1275-1278 1286 1288 1290-1291 1299 1347 1351-1355 1357-1359 1408 1435-1440
+ℹ supabase       |        |          |         | 
+ℹ  functions     |        |          |         | 
+ℹ   tz-telegram  |        |          |         | 
+ℹ    index.ts    | 100.00 |    92.42 |  100.00 | 
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ all files      |  86.23 |    69.42 |   72.50 | 
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ end of coverage report
