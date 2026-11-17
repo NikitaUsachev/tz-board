@@ -34,6 +34,8 @@ jobs:
         run: node tests/browser/mobile-header.cjs
       - name: File cards in Chromium and WebKit
         run: node tests/browser/mobile-files.cjs
+      - name: Filled full mobile sheet
+        run: node tests/browser/full-sheet.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
