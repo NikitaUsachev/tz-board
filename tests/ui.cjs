@@ -61,7 +61,7 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  for(const f of t.listeners.change)f({target:{dataset:{done:'E|item'},checked:true}});assert.match(t.app.innerHTML,/Как вас зовут/);
  assert.doesNotMatch(t.app.innerHTML,/Получать изменения в Telegram/);
  const tg=await boot(false,false,true);assert.match(tg.app.innerHTML,/example_tz_bot\?start=E/);assert.doesNotMatch(tg.app.innerHTML,/Зал готов/);assert.match(tg.app.innerHTML,/Осталось отметить: Звук — 1/);
- const completed=await boot(false,false,true,[{item_id:'item',by_name:'Имя'}]);assert.match(completed.app.innerHTML,/Зал готов/);
+ const completed=await boot(false,false,true,[{item_id:'item',by_name:'Имя'},{item_id:'arrival:item',by_name:'Имя'}]);assert.match(completed.app.innerHTML,/Зал готов/);
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);
  console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, first-check name prompt, hidden trash events');
 })().catch(e=>{console.error(e);process.exitCode=1});

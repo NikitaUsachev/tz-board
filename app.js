@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.18","date":"17 ноября 2026","title":"Два этапа у каждой позиции","groups":[{"title":"Чек-листы","items":["В зале и Смонтировано отмечаются отдельно у каждой позиции Света, Звука, Видео и Сцены. Общие галочки блоков убраны.","Прежние отметки позиций сохранены как Смонтировано; наличие в зале отмечается отдельно."]}]},
 {"version":"28.17","date":"17 ноября 2026","title":"Этапы работ по блокам","groups":[{"title":"Для команды","items":["В блоках Свет, Звук, Видео и Сцена появились отдельные отметки: Всё оборудование в зале и Монтаж завершён.","Для каждого этапа видны имя и время подтверждения. При изменении состава оборудования подтверждения блока сбрасываются."]}]},
 {"version":"28.16","date":"17 ноября 2026","title":"Схемы электропитания","groups":[{"title":"Документы мероприятия","items":["Схему электропитания можно загрузить в шапку ТЗ и отдельно в каждый зал. Доступна загрузка нескольких файлов.","Техники видят схемы только при наличии файлов. Telegram сообщает об обновлении общей схемы или схемы конкретного зала."]}]},
 {"version":"28.15","date":"16 ноября 2026","title":"Личный список залов","groups":[{"title":"Для администраторов","items":["В настройках у каждого администратора свой список залов. Можно добавлять, переименовывать и удалять залы, не меняя списки коллег.","В сохранённых ТЗ остаются свои названия и состав залов. Коллеги могут редактировать общие мероприятия со всеми их залами."]}]},
@@ -442,7 +443,7 @@ function hallProgress(ev,hall){
   var ids=(block.items||[]).filter(function(item){return (item.name||"").trim()}).map(function(item){return item.id});
   if(category.id==="stage")ids=ids.concat(specTasks(block));
   total+=ids.length;
-  var left=ids.filter(function(id){return checksFor!==ev.id||!id||!checks[id]||checks[id].pending}).length;
+  var left=ids.filter(function(id){return checksFor!==ev.id||!id||!checks[id]||checks[id].pending||(category.id!=="extra"&&(!checks["arrival:"+id]||checks["arrival:"+id].pending))}).length;
   if(left)remaining.push(category.name+" — "+left);
  });
  return {done:total>0&&!remaining.length,total:total,remaining:remaining};
@@ -542,8 +543,8 @@ function setCheck(evid,item,done){
  var name=myName();if(done&&!name)return;
  checkPending[key]=true;++checkRequest;
  var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";paintChecks(evid,item);
- var block=item.indexOf("block:")===0?JSON.parse(item.slice(6)):null;
- var rpc=block?"set_block_check":"set_check",args=block?{p_event:evid,p_hall:block[0],p_category:block[1],p_phase:block[2],p_done:done,p_by:name}:{p_event:evid,p_item:item,p_done:done,p_by:name};
+ var arrival=item.indexOf("arrival:")===0;
+ var rpc=arrival?"set_item_arrival":"set_check",args={p_event:evid,p_item:arrival?item.slice(8):item,p_done:done,p_by:name};
  sb.rpc(rpc,args).then(function(r){
   delete checkPending[key];
   if(route()!==evid)return;
@@ -1029,7 +1030,7 @@ function hallsView(ev,isEdit,depts){
   var hch=cats.some(function(c){return markCount(ev,h.id+"|"+c.id)});
   return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hallRole(ev,h.id)?'<span class="hall-role">'+esc(hallRole(ev,h.id))+'</span>':'')+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
    (hc?'':hallFilesView(ev,h.id,false)+(isAdmin?'':'<div class="hall-progress">'+readyButton(ev,h)+'</div>')+'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
- }).join("")+(isEdit?'':'<p class="hint me-line">Отметки «сделано» видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
+ }).join("")+(isEdit?'':'<p class="hint me-line">Отметки выполнения видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
 }
 function chiefRead(b,k){if(!hasChief(b))return "";var m=curMarks["chief|"+k];
  return '<div class="chief'+(m?" mk-changed":"")+'"><span class="eyebrow">Бригадир</span><b>'+esc((b.chief.name||"").trim()||"—")+'</b>'+(m?badge("chief|"+k):"")+phoneHtml(b.chief.phone)+'</div>'}
@@ -1039,26 +1040,24 @@ function staffRead(b){var st=staffOf(b);if(!st.length)return "";
 function specTasks(b){return stageSpecs(b).reduce(function(out,sp){return out.concat(sp.id?specLines(sp).map(function(x){return sp.id+":"+x[2]}):[])},[])}
 function stagesRead(b,k,evid){return stageSpecs(b).map(function(sp,i){if(!specLines(sp).length&&!sp.name&&!sp.location)return "";return '<section class="stage-unit"><div class="stage-unit-title"><b>'+esc(sp.name||("Сцена "+(i+1)))+'</b>'+(sp.location?'<span>'+esc(sp.location)+'</span>':'')+'</div>'+stageRead({spec:sp},k,evid)+'</section>'}).join("")}
 function stageRead(b,k,evid){var L=specLines(b.spec);if(!L.length)return "";var m=curMarks["spec|"+k],sid=b.spec.id;
- return '<div class="stage-spec'+(m?" mk-changed":"")+'">'+L.map(function(x){var tid=sid?sid+":"+x[2]:"",c=tid&&checks[tid];
-  var inner='<span class="eyebrow">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b>'+(c?'<span class="who">✓ '+esc(shortName(c.by)||"отмечено")+(c.at?' · '+esc(fmtWhen(c.at)):'')+'</span>':'<span class="who"></span>');
-  return tid?'<label class="ss ss-chk'+(c?" done":"")+'"><input type="checkbox" data-done="'+esc(evid)+'|'+esc(tid)+'"'+(c?" checked":"")+'><span class="ss-b">'+inner+'</span></label>':'<div class="ss">'+inner+'</div>'}).join("")+'</div>'}
-function blockCheckId(hall,category,phase){return "block:"+JSON.stringify([hall,category,phase])}
-function blockChecksRead(ev,hid,c,b,done){
- if(["sound","light","video","stage"].indexOf(c.id)<0||!((b.items||[]).some(function(i){return (i.name||"").trim()})||c.id==="stage"&&specTasks(b).length))return "";
- return '<fieldset class="block-checks"><legend>Этапы работ · весь блок</legend>'+[["present","Всё оборудование в зале"],["mounted","Монтаж завершён"]].map(function(phase){
-  var id=blockCheckId(hid,c.id,phase[0]),check=done[id];
-  return '<label class="block-check'+(check?' done':'')+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(id)+'"'+(check?' checked':'')+(checkPending[ev.id+'|'+id]?' disabled':'')+' aria-label="'+esc(c.name+': '+phase[1])+'"><span class="block-check-body"><b>'+phase[1]+'</b><span class="who">'+(check?esc(check.by)+(check.at?' · '+esc(fmtWhen(check.at)):''):'Не подтверждено')+'</span></span></label>';
- }).join('')+'</fieldset>';
+ return '<div class="stage-items'+(m?' mk-changed':'')+'">'+L.map(function(x){var tid=sid?sid+":"+x[2]:"";
+ return '<div class="equipment-item"><div class="equipment-title"><b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span></div>'+(tid?itemPhases(evid,tid,x[0],checks):'')+'</div>';
+ }).join('')+'</div>'}
+function itemPhases(evid,id,name,done){
+ return '<div class="item-phases">'+[["arrival:"+id,"В зале"],[id,"Смонтировано"]].map(function(p){var c=done[p[0]],pending=checkPending[evid+"|"+p[0]];
+ return '<label class="item-phase'+(c?' done':'')+'"><input type="checkbox" data-done="'+esc(evid)+'|'+esc(p[0])+'"'+(c?' checked':'')+(pending?' disabled':'')+' aria-label="'+esc(name+': '+p[1])+'"><span><b>'+p[1]+'</b><span class="who">'+(c?esc(c.by)+(c.at?' · '+esc(fmtWhen(c.at)):''):'Не отмечено')+'</span></span></label>';
+ }).join('')+'</div>';
 }
 function catRead(ev,hid,c,done,col){
  col=col||{};var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
  var k=hid+"|"+c.id,cc=!!col[k],n=blockCount(b),ch=markCount(ev,k);
- var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed" title="Новые и изменённые пункты">'+ch+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}).map(function(i){return {id:i.id}}).concat(specTasks(b).map(function(t){return {id:t}})),dn=its.filter(function(i){return checks[i.id]}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
- var phases=blockChecksRead(ev,hid,c,b,done);
+ var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed" title="Новые и изменённые пункты">'+ch+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}).map(function(i){return {id:i.id}}).concat(specTasks(b).map(function(t){return {id:t}})),dn=its.filter(function(i){return checks[i.id]&&(c.id==="extra"||checks["arrival:"+i.id])}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
+ var phases="";
  if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+phases+'</div>';
  var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stagesRead(b,k,ev.id):"";
  if(!items.length&&!plots&&!spec&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+phases+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
+  if(c.id!=="extra")return '<div class="equipment-item'+(m?' mk-'+m:'')+'"><div class="equipment-title"><b>'+esc(it.name)+badge(it.id)+'</b><span>'+esc(qtyStr(it.qty)||'')+'</span></div>'+((it.note||'').trim()?'<p class="equipment-note">'+esc(it.note)+'</p>':'')+itemPhases(ev.id,it.id,it.name,done)+'</div>';
   return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'<span class="who"></span>')+'</label>'}).join("")+'</div>':'')+staff+
   ((b.note||"").trim()?'<p class="cat-note'+(curMarks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
 }

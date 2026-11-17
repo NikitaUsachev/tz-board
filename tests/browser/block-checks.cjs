@@ -14,28 +14,28 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  window.calls.push({name,p});
  if(name==='get_event_v2'||name==='get_event')return {data:[{id:'E',data:ev,version:1}]};
  if(name==='get_checks')return {data:[...checks.values()]};
- if(name==='set_block_check'){
+ if(name==='set_item_arrival'||name==='set_check'){
  if(window.failNext){window.failNext=false;return {error:{message:'Тестовая ошибка'}}}
- const id='block:'+JSON.stringify([p.p_hall,p.p_category,p.p_phase]);if(p.p_done)checks.set(id,{item_id:id,by_name:p.p_by,at:new Date().toISOString()});else checks.delete(id);return {data:null};
+ const id=(name==='set_item_arrival'?'arrival:':'')+p.p_item;if(p.p_done)checks.set(id,{item_id:id,by_name:p.p_by,at:new Date().toISOString()});else checks.delete(id);return {data:null};
  }
  return {data:false};},from(){return {select(){return this},eq(){return this},maybeSingle(){return this},then(resolve){resolve({data:{data:{halls:[{id:'h',name:'Большой зал'}]}}})}}},channel(){return {on(){return this},subscribe(){return this}}},removeChannel(){}})};
  });
  for(const f of ['app.css','light-sheet.css'])await page.addStyleTag({content:fs.readFileSync(path.join(__dirname,'../../',f),'utf8')});
  await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../../app.js'),'utf8')});
- await page.locator('.block-checks').first().waitFor();
- const present=page.getByRole('checkbox',{name:'Звук: Всё оборудование в зале',exact:true});
- const mounted=page.getByRole('checkbox',{name:'Звук: Монтаж завершён',exact:true});
- await present.check();await page.waitForFunction(()=>!document.querySelector('.block-check input').disabled);
+ await page.locator('.item-phases').first().waitFor();
+ const present=page.getByRole('checkbox',{name:'Радиомикрофон: В зале',exact:true});
+ const mounted=page.getByRole('checkbox',{name:'Радиомикрофон: Смонтировано',exact:true});
+ await present.check();await page.waitForFunction(()=>!document.querySelector('.item-phase input').disabled);
  assert.equal(await present.isChecked(),true);assert.equal(await mounted.isChecked(),false);
  assert.match(await present.locator('..').textContent(),/Иванов Иван/);
- await mounted.check();await page.waitForFunction(()=>document.querySelectorAll('.block-check input:disabled').length===0);
- await present.uncheck();await page.waitForFunction(()=>document.querySelectorAll('.block-check input:disabled').length===0);
+ await mounted.check();await page.waitForFunction(()=>document.querySelectorAll('.item-phase input:disabled').length===0);
+ await present.uncheck();await page.waitForFunction(()=>document.querySelectorAll('.item-phase input:disabled').length===0);
  assert.equal(await mounted.isChecked(),true);
- await page.evaluate(()=>window.failNext=true);await present.click();await page.waitForFunction(()=>document.querySelectorAll('.block-check input:disabled').length===0);assert.equal(await present.isChecked(),false);
+ await page.evaluate(()=>window.failNext=true);await present.click();await page.waitForFunction(()=>document.querySelectorAll('.item-phase input:disabled').length===0);assert.equal(await present.isChecked(),false);
  for(const width of [375,768,1440]){
  await page.setViewportSize({width,height:900});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Horizontal overflow '+width);
- const boxes=await page.locator('.cat-sound .block-check').evaluateAll(els=>els.map(e=>({x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y,h:e.getBoundingClientRect().height})));
+ const boxes=await page.locator('.cat-sound .item-phase').evaluateAll(els=>els.map(e=>({x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y,h:e.getBoundingClientRect().height})));
  assert.ok(boxes.every(b=>b.h>=44));if(width===375)assert.ok(boxes[1].y>boxes[0].y);
  if(width===375)await page.screenshot({path:'/tmp/block-checks-mobile.png',fullPage:true});
  }
