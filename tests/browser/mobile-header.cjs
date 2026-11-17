@@ -17,7 +17,7 @@ const {boot}=require('../helpers/app-harness.cjs');
  const result=await page.evaluate(()=>{const root=document.querySelector('.top-in');const rb=root.getBoundingClientRect();return [...root.querySelectorAll('select,input,button')].map(e=>{const b=e.getBoundingClientRect();return {name:e.id||e.className,left:b.left,right:b.right,width:b.width,containerRight:rb.right}})});
  for(const r of result)assert.ok(r.left>=-1&&r.right<=width+1&&r.width>0,`${engine.name()} ${role} ${theme} ${width}: ${JSON.stringify(r)}`);
  if(role==='tech'){
- const bounds=await page.locator('.sheet-navigation').evaluate(e=>({scroll:e.scrollWidth,client:e.clientWidth}));assert.ok(bounds.scroll<=bounds.client+1,JSON.stringify(bounds));
+ const bounds=await page.locator('.sheet-navigation').evaluate(e=>({scroll:e.scrollWidth,client:e.clientWidth}));assert.ok(bounds.scroll<=bounds.client+1,`${engine.name()} ${role} ${theme} ${width}: ${JSON.stringify(bounds)}`);
  await page.selectOption('#hall-navigation','h');
  }
  }
