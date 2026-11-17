@@ -103,3 +103,17 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
  .event-sheet .person{grid-template-columns:minmax(0,1fr)}
  .event-sheet .person .tel{justify-self:start}
 }
+
+/* Block-level logistics and installation confirmations. */
+.block-checks{margin:12px 0 18px;padding:12px;border:1px solid var(--line,#86949a);border-left:4px solid #ed945b;border-radius:8px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.block-checks legend{padding:0 8px;font-size:12px;font-weight:700;letter-spacing:.04em}
+.block-check{display:flex;align-items:center;gap:12px;min-height:68px;padding:12px;background:rgba(128,153,168,.10);border:1px solid var(--line,#86949a);border-radius:6px;cursor:pointer;box-sizing:border-box;min-width:0}
+.block-check input{width:24px;height:24px;flex:0 0 24px;margin:0;accent-color:#287458;cursor:pointer}
+.block-check-body{display:flex;flex-direction:column;gap:5px;min-width:0}
+.block-check-body b{font-size:15px;line-height:1.35}
+.block-check .who{display:block;min-height:1.3em;font-size:12px;line-height:1.4;overflow-wrap:anywhere;opacity:.8}
+.block-check.done{background:rgba(70,164,120,.14);border-color:#548b70;text-decoration:none}
+.block-check.done b{text-decoration:none}
+.block-check:focus-within{outline:2px solid #ed945b;outline-offset:3px}
+.block-check:has(input:disabled){opacity:.65;cursor:wait}
+@media(max-width:640px){.block-checks{grid-template-columns:1fr;padding:10px;gap:8px}.block-check{min-height:72px}}
