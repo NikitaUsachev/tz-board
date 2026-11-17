@@ -1,0 +1,32 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync(process.argv[2]||'app.js','utf8');
+const ctx=vm.createContext({console,editing:null,state:{events:[],halls:[]},legacyHalls:[],route:()=>null,hallRole:()=>'',render:()=>{},toast:()=>{},CATS:[],MAX_FILE:50*1024*1024,BUCKET:'plots',PLOT_ACCEPT:'.pdf,.dwg',dirty:false,curMarks:{}});
+function load(name){const start=src.indexOf('function '+name+'(');assert.ok(start>=0,name);for(let end=src.indexOf('}',start);end>=0;end=src.indexOf('}',end+1)){const code=src.slice(start,end+1);try{new vm.Script('('+code+')')}catch{continue}vm.runInContext(code,ctx);return}throw Error('Cannot extract '+name);}
+vm.runInContext(src.split('\n').find(l=>l.startsWith('var DOCS=')),ctx);
+for(const f of ['clone','esc','fileExt','fmtSize','isImg','fileLists','allPaths','uploading','listFor','uploadFiles','filesRead','filesEdit','hallFilesView','cleanEvent','snapshotHalls','hallById','evById','byId','computeDiff'])load(f);
+ctx.fileUrl=f=>'https://example.test/'+f.path;ctx.badge=()=>'';let uid=0;ctx.uid=()=>String(++uid);
+const requests=[];ctx.sb={storage:{from:()=>({upload:(path,file)=>{requests.push({path,file});return Promise.resolve({})}})}};
+(async()=>{
+ const ev=ctx.editing={id:'test',halls:['A'],blocks:{}};
+ ctx.uploadFiles('p|A',[{name:'hall.pdf',size:10,type:'application/pdf'},{name:'hall.dwg',size:20}]);
+ ctx.uploadFiles('d|power',[{name:'general.pdf',size:30,type:'application/pdf'}]);
+ assert.equal(ctx.uploading(ev),true);
+ await Promise.resolve();
+ assert.equal(ctx.uploading(ev),false);
+ assert.equal(requests.length,3);
+ assert.equal(ev.hallPowerFiles.A.length,2);assert.equal(ev.docs.power.length,1);
+ assert.equal(ctx.allPaths(ev).length,3);
+ assert.equal(ctx.hallFilesView({},'A',false),'');
+ assert.match(ctx.hallFilesView(ev,'A',false),/Схема электропитания/);
+ assert.match(ctx.hallFilesView({},'A',true),/data-upload="p\|A"/);
+ assert.match(ctx.filesRead(ev.docs.power,'Схема электропитания'),/general.pdf/);
+ ev.hallPowerFiles.A.push({id:'pending',uploading:true},{id:'failed'});
+ const cleaned=ctx.cleanEvent(ev);
+ assert.equal(ctx.computeDiff({halls:['A']},cleaned).marks[cleaned.hallPowerFiles.A[0].id],'new');
+ assert.equal(cleaned.hallPowerFiles.A.length,2);assert.equal(cleaned.docs.power.length,1);
+ assert.equal(ev.hallPowerFiles.A.length,4);
+ ctx.listFor('p|A').splice(0,1);assert.equal(ev.docs.power.length,1);
+ ctx.uploadFiles('p|B',[{name:'huge.pdf',size:51*1024*1024}]);
+ assert.equal(requests.length,3);
+ console.log('PASS: multiple uploads, separate header/hall lists, save cleanup, empty technician view, removal, file size limit');
+})().catch(e=>{console.error(e);process.exitCode=1});
