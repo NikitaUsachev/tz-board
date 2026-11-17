@@ -1,27 +1,5 @@
-// Runs the complete script with a minimal DOM and API model; no live requests.
-const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
-const source=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
-const tick=()=>new Promise(setImmediate);
-async function boot(admin,deleted=false,telegram=false,done=[]){
- const listeners={},winListeners={},store=new Map();let html='';
- const app={classList:{toggle(){}},addEventListener:(n,f)=>(listeners[n]??=[]).push(f),get innerHTML(){return html},set innerHTML(v){html=v}};
- const ev={id:'E',title:'Known event',date:'2026-12-01',halls:['h'],status:'prep',blocks:{h:{sound:{items:[{id:'item',name:'Microphone',qty:'2'}],note:''}}}};if(deleted)ev.deletedAt='2026-11-01';
- const rows=[{id:'E',data:ev,version:1,updated_at:'2026-11-01T00:00:00Z'}];
- const sb={auth:{getSession:async()=>({data:{session:admin?{user:{id:'user',email:'admin@example.com'}}:null}}),updateUser:async({data})=>({data:{user:{id:"user",email:"admin@example.com",user_metadata:data}}}),onAuthStateChange(){}},rpc:async(name)=>({data:name==='is_admin'?true:name==='get_event_v2'?rows:name==='get_checks'?done:name==='tg_event_info'?{username:'example_tz_bot',ready:{}}:[]}),from(table){return new class{
-  constructor(){this.filters=[];this.op='read';this.single=false}
-  select(){return this}eq(k,v){this.filters.push([k,v]);return this}neq(){return this}order(){return this}maybeSingle(){this.single=true;return this}insert(p){this.op='insert';this.p=p;return this}
-  then(a,b){return Promise.resolve().then(()=>{let data=table==='events'?rows:table==='settings'?[{id:1,data:{halls:[{id:'h',name:'Main'}]},updated_at:'stamp'}]:[{email:'admin@example.com'}];if(this.op==='insert'){const r={...this.p,version:1,updated_at:'2026-11-01T00:00:00Z'};rows.push(r);data=[r]}else data=data.filter(r=>this.filters.every(([k,v])=>r[k]===v));return {data:this.single?(data[0]||null):JSON.parse(JSON.stringify(data))}}).then(a,b)}
- }},channel(){return {on(){return this},subscribe(){return this}}},removeChannel(){},storage:{from:()=>({upload:async()=>({error:null}),getPublicUrl:()=>({data:{publicUrl:'https://example.test/file'}})})}};
- const location={hash:admin?'':'#ev-E',pathname:'/',search:'',origin:'https://example.test'};
- let hashValue=location.hash;Object.defineProperty(location,'hash',{get:()=>hashValue,set:v=>{hashValue=v?(String(v).startsWith('#')?String(v):'#'+v):''}});
- const nodes={app,toast:{},saving:{}};
- const document={title:'ТЗ',activeElement:null,hidden:false,cookie:'',documentElement:{getAttribute:()=>null,setAttribute(){}},getElementById:id=>nodes[id]||null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
- const c={console,JSON,Date,Promise,crypto:require('node:crypto').webcrypto,document,location,history:{replaceState(a,b,url){location.hash=url.includes('#')?'#'+url.split('#')[1]:''},pushState(a,b,url){location.hash=url.includes('#')?'#'+url.split('#')[1]:''}},localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},sessionStorage:{getItem:()=>null,setItem(){}},navigator:{},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,supabase:{createClient:()=>sb},TZ_CONFIG:{url:'https://example.test',key:'public',telegram},innerWidth:1200,scrollY:0,scrollTo(){},addEventListener:(n,f)=>(winListeners[n]??=[]).push(f)};c.window=c;
- vm.createContext(c);vm.runInContext(source.replace(/\}\)\(\);?\s*$/, 'window.__test={renewChangedTasks,specTasks,hallProgress,cleanEvent};})();'),c);await tick();await tick();
- const click=(act,dataset={})=>{for(const f of listeners.click||[])f({target:{closest:()=>({getAttribute:()=>act,dataset,tagName:'BUTTON'})},preventDefault(){}})};
- const hash=()=>{for(const f of winListeners.hashchange||[])f()};
- return {c,app,click,hash,store,listeners,rows};
-}
+const assert=require('node:assert/strict');
+const {boot,tick}=require('./helpers/app-harness.cjs');
 (async()=>{
  const multi=await boot(true);multi.click('new',{st:'draft'});multi.hash();
  for(const f of multi.listeners.change)f({target:{dataset:{hallpick:'h'},checked:true}});

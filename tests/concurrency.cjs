@@ -15,19 +15,19 @@ function tasks(){
 }
 async function tech(){
  const pending={},state={halls:[],events:[]};let route='A';
- const c=ctx({state,isAdmin:false,versions:{},loaded:false,loadError:'',techRequest:0,route:()=>route,render(){},ls:{get:()=>null},markSeen(){},toast(){},flagTitle(){},sb:{from:()=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{data:{halls:[]}}})}),rpc:(_,p)=>new Promise(r=>pending[p.p_id]=r)}},part('function loadTech(','/* ---------- shared'));
+ const c=ctx({state,isAdmin:false,versions:{},loaded:false,loadError:'',techRequest:0,refreshTelegram(){},route:()=>route,render(){},ls:{get:()=>null},markSeen(){},toast(){},flagTitle(){},sb:{from:()=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{data:{halls:[]}}})}),rpc:(_,p)=>new Promise(r=>pending[p.p_id]=r)}},part('function loadTech(','/* ---------- shared'));
  const a=c.loadTech('A');route='B';const b=c.loadTech('B');pending.B({data:[{id:'B',data:{title:'B'},version:2}]});await b;pending.A({data:[{id:'A',data:{title:'A'},version:1}]});await a;assert.equal(state.events[0].id,'B');
 }
 async function checks(){
  let calls=0,reject;let route='E';
- const c=ctx({checks:{},checksKey:'',checkRequest:0,checkPending:{},route:()=>route,myName:()=> 'Nikita',render(){},toast(){},loadChecks(){},sb:{rpc:()=>{calls++;return new Promise((_,r)=>reject=r)}}},part('function setCheck(','setInterval('));
+ const c=ctx({checks:{},checksKey:'',checkRequest:0,checkPending:{},route:()=>route,myName:()=> 'Nikita',paintChecks(){},render(){},toast(){},loadChecks(){},sb:{rpc:()=>{calls++;return new Promise((_,r)=>reject=r)}}},part('function setCheck(','setInterval('));
  c.setCheck('E','item',true);c.setCheck('E','item',false);assert.equal(calls,1,'Duplicate write must be blocked');assert.equal(c.checks.item.by,'Nikita');
  reject(Error('offline'));await tick();assert.equal(c.checks.item,undefined);assert.equal(Object.keys(c.checkPending).length,0);
  c.setCheck('E','item',true);route='F';c.checks={foreign:{by:'Other'}};reject(Error('offline'));await tick();assert.deepEqual(Object.keys(c.checks),['foreign']);
 }
 async function settings(){
  let db={halls:[{id:'h',name:'Original'}],keep:'unchanged'};let stamp='old';
- const base=structuredClone(db),c={busy:false,isAdmin:true,settingsData:structuredClone(db),settingsStamp:stamp,modal:{settingsBase:structuredClone(base),settingsExists:true},state:{halls:[]},clone:structuredClone,showSaving(){},toast(){},render(){},fail(){return false},loadAll(){return Promise.resolve()}};
+ const base=structuredClone(db),c={busy:false,isAdmin:true,session:{user:{id:'admin'}},settingsData:structuredClone(db),settingsStamp:stamp,modal:{settingsBase:structuredClone(base),settingsExists:true},state:{halls:[]},clone:structuredClone,showSaving(){},toast(){},render(){},fail(){return false},loadAll(){return Promise.resolve()}};
  c.sb={from:()=>({filters:{},update(p){this.p=p;return this},eq(k,v){this.filters[k]=v;return this},select(){const match=JSON.stringify(db)===this.filters.data;if(match){db=this.p.data;stamp='new'}return Promise.resolve({data:match?[{id:1,updated_at:stamp}]:[]})}})};
  ctx(c,part('function saveHalls(','/* ---------- UI bits'));
  db.halls[0].name='Colleague';assert.equal(await c.saveHalls([{id:'h',name:'Mine'}]),false);assert.equal(db.halls[0].name,'Colleague');
@@ -39,7 +39,7 @@ function retainedFiles(){
 }
 async function board(){
  let email='admin',pending=[];
- const c=ctx({allRequest:0,myEmail:()=>email,isAdmin:true,clone:structuredClone,settingsData:{},settingsStamp:null,state:{halls:[],events:[]},versions:{},loaded:false,loadError:'',render(){},sb:{from:table=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{updated_at:'stamp',data:{halls:[],extra:'keep'}}}),then:resolve=>new Promise(r=>pending.push(r)).then(resolve)})}},part('function loadAll(','function loadTech('));
+ const c=ctx({allRequest:0,session:{user:{id:'admin'}},myEmail:()=>email,isAdmin:true,clone:structuredClone,settingsData:{},settingsStamp:null,state:{halls:[],events:[]},versions:{},loaded:false,loadError:'',render(){},sb:{from:table=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{updated_at:'stamp',data:{halls:[],extra:'keep'}}}),then:resolve=>new Promise(r=>pending.push(r)).then(resolve)})}},part('function loadAll(','function loadTech('));
  const first=c.loadAll();await tick();const second=c.loadAll();await tick();
  pending[1]({data:[{id:'latest',data:{},version:2}]});await second;pending[0]({data:[{id:'old',data:{},version:1}]});await first;
  assert.equal(c.state.events[0].id,'latest');assert.equal(c.settingsData.extra,'keep');

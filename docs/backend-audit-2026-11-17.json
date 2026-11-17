@@ -1,0 +1,118 @@
+{
+  "date": "2026-11-17",
+  "baseCommit": "bd9d9e203e7542d968afc5d5b093dd46b99673f0",
+  "passed": 16,
+  "failed": 6,
+  "results": [
+    {
+      "name": "Absent stage property rejected",
+      "detail": "A cover checkbox can be submitted for a stage without a cover",
+      "passed": false
+    },
+    {
+      "name": "Additional stage task supported",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Anon cannot claim Telegram outbox",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Anon cannot create event",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Anon cannot forge bot command",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Anon cannot list events",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Anon cannot list personal halls",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Blank technician name rejected",
+      "detail": "Server accepts an empty name although UI requires it",
+      "passed": false
+    },
+    {
+      "name": "DB rejects overlapping hall/date",
+      "detail": "Two events with the same hall/date were accepted; frontend check is not atomic",
+      "passed": false
+    },
+    {
+      "name": "Deleted event check rejected",
+      "detail": "set_check does not inspect deletedAt",
+      "passed": false
+    },
+    {
+      "name": "Deleted event unavailable through RPC",
+      "detail": "UI hides trash but direct get_event still returns its data",
+      "passed": false
+    },
+    {
+      "name": "Deleted hall readiness rejected",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Hall ready rejected while tasks remain",
+      "detail": "Only one completed task is checked server-side; remaining tasks do not block RPC",
+      "passed": false
+    },
+    {
+      "name": "Task can be unchecked",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Technician can fetch a known event",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Unapproved user cannot create event",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Unapproved user cannot list events",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Unapproved user cannot read personal catalogues",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Unapproved user is not admin",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Unknown hall readiness rejected",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Unknown task rejected",
+      "detail": "",
+      "passed": true
+    },
+    {
+      "name": "Valid task can be checked",
+      "detail": "",
+      "passed": true
+    }
+  ]
+}
