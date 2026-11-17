@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.17","date":"17 ноября 2026","title":"Этапы работ по блокам","groups":[{"title":"Для команды","items":["В блоках Свет, Звук, Видео и Сцена появились отдельные отметки: Всё оборудование в зале и Монтаж завершён.","Для каждого этапа видны имя и время подтверждения. При изменении состава оборудования подтверждения блока сбрасываются."]}]},
 {"version":"28.16","date":"17 ноября 2026","title":"Схемы электропитания","groups":[{"title":"Документы мероприятия","items":["Схему электропитания можно загрузить в шапку ТЗ и отдельно в каждый зал. Доступна загрузка нескольких файлов.","Техники видят схемы только при наличии файлов. Telegram сообщает об обновлении общей схемы или схемы конкретного зала."]}]},
 {"version":"28.15","date":"16 ноября 2026","title":"Личный список залов","groups":[{"title":"Для администраторов","items":["В настройках у каждого администратора свой список залов. Можно добавлять, переименовывать и удалять залы, не меняя списки коллег.","В сохранённых ТЗ остаются свои названия и состав залов. Коллеги могут редактировать общие мероприятия со всеми их залами."]}]},
 {"version":"28.14","date":"14 ноября 2026","title":"Персонал и бригадиры заметнее в ТЗ","groups":[{"title":"Оформление","items":["Персонал и бригадиры выделены мягкой голубой подложкой и линией слева во всех отделах.","Имена выделены жирным шрифтом. Оформление адаптировано для светлой и тёмной тем."]}]},
@@ -506,7 +507,7 @@ function paintChecks(id,task){
  template.content.querySelectorAll("input[data-done]").forEach(function(next){
   var input=current.get(next.dataset.done);if(!input)return;
   var row=input.closest("label"),fresh=next.closest("label");
-  if(input.checked!==next.checked)input.checked=next.checked;row.classList.toggle("done",next.checked);
+  if(input.checked!==next.checked)input.checked=next.checked;row.classList.toggle("done",next.checked);input.disabled=next.disabled;
   var who=row.querySelector(".who"),updated=fresh.querySelector(".who");
   if(updated&&!who)(row.querySelector(".ss-b")||row).appendChild(updated.cloneNode(true));
   else if(who&&!updated)who.remove();
@@ -541,7 +542,9 @@ function setCheck(evid,item,done){
  var name=myName();if(done&&!name)return;
  checkPending[key]=true;++checkRequest;
  var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";paintChecks(evid,item);
- sb.rpc("set_check",{p_event:evid,p_item:item,p_done:done,p_by:name}).then(function(r){
+ var block=item.indexOf("block:")===0?JSON.parse(item.slice(6)):null;
+ var rpc=block?"set_block_check":"set_check",args=block?{p_event:evid,p_hall:block[0],p_category:block[1],p_phase:block[2],p_done:done,p_by:name}:{p_event:evid,p_item:item,p_done:done,p_by:name};
+ sb.rpc(rpc,args).then(function(r){
   delete checkPending[key];
   if(route()!==evid)return;
   if(r.error){if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid,item);toast("Не удалось сохранить отметку: "+r.error.message);return}
@@ -1039,14 +1042,23 @@ function stageRead(b,k,evid){var L=specLines(b.spec);if(!L.length)return "";var 
  return '<div class="stage-spec'+(m?" mk-changed":"")+'">'+L.map(function(x){var tid=sid?sid+":"+x[2]:"",c=tid&&checks[tid];
   var inner='<span class="eyebrow">'+esc(x[0])+'</span><b>'+esc(x[1])+'</b>'+(c?'<span class="who">✓ '+esc(shortName(c.by)||"отмечено")+(c.at?' · '+esc(fmtWhen(c.at)):'')+'</span>':'<span class="who"></span>');
   return tid?'<label class="ss ss-chk'+(c?" done":"")+'"><input type="checkbox" data-done="'+esc(evid)+'|'+esc(tid)+'"'+(c?" checked":"")+'><span class="ss-b">'+inner+'</span></label>':'<div class="ss">'+inner+'</div>'}).join("")+'</div>'}
+function blockCheckId(hall,category,phase){return "block:"+JSON.stringify([hall,category,phase])}
+function blockChecksRead(ev,hid,c,b,done){
+ if(["sound","light","video","stage"].indexOf(c.id)<0||!((b.items||[]).some(function(i){return (i.name||"").trim()})||c.id==="stage"&&specTasks(b).length))return "";
+ return '<fieldset class="block-checks"><legend>Этапы работ · весь блок</legend>'+[["present","Всё оборудование в зале"],["mounted","Монтаж завершён"]].map(function(phase){
+  var id=blockCheckId(hid,c.id,phase[0]),check=done[id];
+  return '<label class="block-check'+(check?' done':'')+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(id)+'"'+(check?' checked':'')+(checkPending[ev.id+'|'+id]?' disabled':'')+' aria-label="'+esc(c.name+': '+phase[1])+'"><span class="block-check-body"><b>'+phase[1]+'</b><span class="who">'+(check?esc(check.by)+(check.at?' · '+esc(fmtWhen(check.at)):''):'Не подтверждено')+'</span></span></label>';
+ }).join('')+'</fieldset>';
+}
 function catRead(ev,hid,c,done,col){
  col=col||{};var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
  var k=hid+"|"+c.id,cc=!!col[k],n=blockCount(b),ch=markCount(ev,k);
  var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed" title="Новые и изменённые пункты">'+ch+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}).map(function(i){return {id:i.id}}).concat(specTasks(b).map(function(t){return {id:t}})),dn=its.filter(function(i){return checks[i.id]}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
- if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+'</div>';
+ var phases=blockChecksRead(ev,hid,c,b,done);
+ if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+phases+'</div>';
  var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stagesRead(b,k,ev.id):"";
  if(!items.length&&!plots&&!spec&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
- return '<div class="cat cat-'+c.id+'">'+head+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
+ return '<div class="cat cat-'+c.id+'">'+head+phases+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
   return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'<span class="who"></span>')+'</label>'}).join("")+'</div>':'')+staff+
   ((b.note||"").trim()?'<p class="cat-note'+(curMarks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
 }
@@ -1381,7 +1393,7 @@ app.addEventListener("change",function(e){
  var t=e.target,d=t.dataset;
  if(t.id==="hall-navigation"&&t.value){var targetHall=t.value;t.value="";jumpToHall(targetHall);return}
  if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.hallNames=editing.hallNames||{};var picked=state.halls.filter(function(h){return h.id===id})[0];if(picked&&!editing.hallNames[id])editing.hallNames[id]=picked.name;editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
- if(d.done){var p=d.done.split("|");if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30)}else setCheck(p[0],p[1],t.checked)}
+ if(d.done){var at=d.done.indexOf("|"),p=[d.done.slice(0,at),d.done.slice(at+1)];if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30)}else setCheck(p[0],p[1],t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
  if(d.upload&&editing&&t.files&&t.files.length){uploadFiles(d.upload,t.files);t.value=""}
 });
