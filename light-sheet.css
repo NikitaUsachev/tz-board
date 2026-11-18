@@ -19,7 +19,7 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 .sheet-navigation select{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-size:16px;text-overflow:ellipsis;overflow:hidden;appearance:none;-webkit-appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat}
 .sheet-navigation .btn{min-width:0;white-space:nowrap;box-sizing:border-box}
 .top-in>.search{width:100%;min-width:0;box-sizing:border-box}
-@media(max-width:560px){.sheet-navigation{grid-template-columns:minmax(0,1fr) max-content}.sheet-navigation select{width:100%;max-width:100%}.top-in>.search{max-width:100%}.top-in>.brand{flex:1 1 0}.top-in>.brand h1{overflow-wrap:anywhere}}
+@media(max-width:560px){.sheet-navigation{grid-template-columns:minmax(0,1fr) max-content}.sheet-navigation select{width:100%;max-width:100%}.top-in>.search{max-width:100%}.top-in>.brand{flex:1 0 100%;flex-wrap:wrap;align-items:center}.top-in>.brand h1{flex:1 0 100%;min-width:0;overflow-wrap:normal}}
 @media print{.sheet-navigation{display:none}}
 
 
