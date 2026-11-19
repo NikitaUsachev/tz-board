@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.22","date":"20 ноября 2026","title":"Восстановление загрузки","groups":[{"title":"Надёжность","items":["При задержке загрузки появляется понятное сообщение и кнопка повторной попытки.","Загрузка приложения больше не зависит от внешнего сервера библиотеки.","Ошибки проверки входа больше не оставляют бесконечный экран загрузки."]}]},
 {"version":"28.21","date":"17 ноября 2026","title":"Ширина ТЗ на телефоне","groups":[{"title":"Исправления","items":["Длинные названия и назначения залов переносятся внутри страницы и не растягивают мобильный лист ТЗ."]}]},
 {"version":"28.20","date":"17 ноября 2026","title":"Файлы на телефоне","groups":[{"title":"Исправления","items":["Длинные названия файлов переносятся внутри карточки. Метка Новое, размер и кнопки Открыть / Скачать больше не выходят за её границы."]}]},
 {"version":"28.19","date":"17 ноября 2026","title":"Мобильная навигация","groups":[{"title":"Исправления","items":["Выбор зала, кнопка Наверх и поиск помещаются в ширину экрана телефона, в том числе при длинных названиях залов."]}]},
@@ -398,14 +399,35 @@ async function saveAccountProfile(){
 }
 function myEmail(){return session&&session.user&&session.user.email||""}
 
+var startupError="",startupAttempt=0;
+function readDeadline(operation,label){
+ return new Promise(function(resolve,reject){
+  var timer=setTimeout(function(){reject(new Error("Не удалось загрузить "+label+" за 15 секунд. Проверьте соединение и повторите."))},15000);
+  Promise.resolve(operation).then(function(value){clearTimeout(timer);resolve(value)},function(error){clearTimeout(timer);reject(error)});
+ });
+}
+function startSession(){
+ var attempt=++startupAttempt;
+ ++authRequest;
+ startupError="";authReady=false;render();
+ return readDeadline(sb.auth.getSession(),"вход").then(function(r){
+  if(attempt!==startupAttempt)return;
+  if(r.error)throw r.error;
+  session=r.data&&r.data.session||null;cleanAuthHash();return checkAdmin();
+ }).catch(function(error){
+  if(attempt!==startupAttempt)return;
+  startupError="Не удалось восстановить вход. Проверьте соединение и повторите.";
+  authReady=false;render();
+ });
+}
 /* ---------- data ---------- */
 function loadAll(){
  var request=++allRequest,who=myEmail();
- return Promise.all([
+ return readDeadline(Promise.all([
   sb.from("settings").select("data,updated_at").eq("id",1).maybeSingle(),
   sb.from("events").select("id,data,version,updated_at,updated_by"),
   sb.from("admin_hall_settings").select("data,updated_at").eq("user_id",session.user.id).maybeSingle()
- ]).then(function(r){
+ ]),"данные ТЗ").then(function(r){
   if(request!==allRequest||!isAdmin||who!==myEmail())return;
   if(r[0].error)throw r[0].error;
   if(r[1].error)throw r[1].error;
@@ -478,10 +500,10 @@ function sendHallReady(button,hall){
 function loadTech(id){
  if(!id){render();return Promise.resolve()}
  var request=++techRequest;
- return Promise.all([
+ return readDeadline(Promise.all([
   sb.from("settings").select("data").eq("id",1).maybeSingle(),
   sb.rpc("get_event_v2",{p_id:id}).then(function(r){return r.error&&(r.error.code==="PGRST202"||r.error.code==="42883")?sb.rpc("get_event",{p_id:id}):r})
- ]).then(function(r){
+ ]),"данные ТЗ").then(function(r){
   if(request!==techRequest||route()!==id||isAdmin)return;
   if(r[0].error)throw r[0].error;
   if(r[1].error)throw r[1].error;
@@ -567,16 +589,16 @@ function unsubscribe(){if(rtChannel){try{sb.removeChannel(rtChannel)}catch(_){}r
 function checkAdmin(){
  var request=++authRequest,who=myEmail();
  var current=function(){return request===authRequest&&who===myEmail()};
- var p=session?sb.rpc("is_admin").then(function(r){if(current())isAdmin=!r.error&&r.data===true}):Promise.resolve(isAdmin=false);
+ var p=session?readDeadline(sb.rpc("is_admin"),"права доступа").then(function(r){if(r.error)throw r.error;if(current())isAdmin=r.data===true}):Promise.resolve(isAdmin=false);
  return p.then(function(){
   if(!current())return;
-  authReady=true;loaded=false;
-  if(isAdmin){subscribe();return Promise.all([loadAll(),loadAdmins(),loadRequests()]).then(render)}
-  if(session)sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()});
+  startupError="";authReady=true;loaded=false;
+  if(isAdmin){subscribe();loadAdmins().catch(function(){});loadRequests().then(function(){if(!editing&&!modal)render()}).catch(function(){});return loadAll()}
+  if(session)sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()}).catch(function(){});
   unsubscribe();admins=[];state.events=[];state.halls=[];legacyHalls=[];settingsData={};settingsStamp=null;versions={};editing=null;if(modal&&modal.t==="settings")modal=null;
   if(route())return loadTech(route());
   loaded=true;render();
- });
+ }).catch(function(error){if(!current())return;startupError="Не удалось проверить права доступа. Проверьте соединение и повторите.";authReady=false;render()});
 }
 var requests=[],reqStatus="";
 function loadRequests(){return sb.rpc("list_admin_requests").then(function(r){if(!r.error)requests=r.data||[]})}
@@ -1182,7 +1204,7 @@ function render(){
  var active=document.activeElement, aid=active&&active.id, sel=null;
  try{if(aid&&active.selectionStart!=null)sel=[active.selectionStart,active.selectionEnd]}catch(_){}
  var body;
- if(!authReady)body='<div class="sheet gut"><div class="no-halls">Загрузка…</div></div>';
+ if(!authReady)body='<div class="sheet gut"><div class="no-halls">'+(startupError?esc(startupError)+'<br><br><button class="btn" data-act="retry-start">Повторить загрузку</button>':'Проверяем вход…')+'</div></div>';
  else if(isAdmin)body=id?sheetView(id):boardView();
  else if(id)body=sheetView(id);
  else body=authView();
@@ -1252,6 +1274,7 @@ app.addEventListener("click",function(e){
    if(editing&&dirty&&!exitArmed){exitArmed=true;render();return}
    if(leaveEdit(true)){delArmed=false;go(null)}break;
   case "tg-ready":sendHallReady(t,d.h);break;
+  case "retry-start":startSession();break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
@@ -1444,7 +1467,8 @@ function cleanAuthHash(){if(/access_token=|error_description=|type=recovery/.tes
 var urlErr=(location.hash.match(/error_description=([^&]+)/)||[])[1];
 if(urlErr){auth.err=decodeURIComponent(urlErr.replace(/\+/g," "));if(/expired|invalid/i.test(auth.err))auth.err="Ссылка из письма устарела или уже использована. Запросите новую.";}
 render();
-sb.auth.getSession().then(function(r){session=r.data&&r.data.session||null;cleanAuthHash();return checkAdmin()});
+window.TZ_APP_STARTED=true;
+startSession();
 sb.auth.onAuthStateChange(function(ev,s){
  var prev=session&&session.user&&session.user.id;session=s||null;
  if(ev==="PASSWORD_RECOVERY"){modal={t:"newpass"};}

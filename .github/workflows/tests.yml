@@ -20,14 +20,16 @@ jobs:
         run: npm run test:coverage
   browser-checks:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - run: npm install --no-save --package-lock=false playwright@1.58.2
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Startup failures and recovery
+        run: node tests/browser/startup.cjs
       - name: Block confirmations in Chromium
         run: node tests/browser/block-checks.cjs
       - name: Mobile header in Chromium and WebKit

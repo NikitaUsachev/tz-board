@@ -15,7 +15,7 @@ function tasks(){
 }
 async function tech(){
  const pending={},state={halls:[],events:[]};let route='A';
- const c=ctx({state,isAdmin:false,versions:{},loaded:false,loadError:'',techRequest:0,refreshTelegram(){},route:()=>route,render(){},ls:{get:()=>null},markSeen(){},toast(){},flagTitle(){},sb:{from:()=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{data:{halls:[]}}})}),rpc:(_,p)=>new Promise(r=>pending[p.p_id]=r)}},part('function loadTech(','/* ---------- shared'));
+ const c=ctx({readDeadline:p=>p,state,isAdmin:false,versions:{},loaded:false,loadError:'',techRequest:0,refreshTelegram(){},route:()=>route,render(){},ls:{get:()=>null},markSeen(){},toast(){},flagTitle(){},sb:{from:()=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{data:{halls:[]}}})}),rpc:(_,p)=>new Promise(r=>pending[p.p_id]=r)}},part('function loadTech(','/* ---------- shared'));
  const a=c.loadTech('A');route='B';const b=c.loadTech('B');pending.B({data:[{id:'B',data:{title:'B'},version:2}]});await b;pending.A({data:[{id:'A',data:{title:'A'},version:1}]});await a;assert.equal(state.events[0].id,'B');
 }
 async function checks(){
@@ -39,14 +39,14 @@ function retainedFiles(){
 }
 async function board(){
  let email='admin',pending=[];
- const c=ctx({allRequest:0,session:{user:{id:'admin'}},myEmail:()=>email,isAdmin:true,clone:structuredClone,settingsData:{},settingsStamp:null,state:{halls:[],events:[]},versions:{},loaded:false,loadError:'',render(){},sb:{from:table=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{updated_at:'stamp',data:{halls:[],extra:'keep'}}}),then:resolve=>new Promise(r=>pending.push(r)).then(resolve)})}},part('function loadAll(','function loadTech('));
+ const c=ctx({readDeadline:p=>p,allRequest:0,session:{user:{id:'admin'}},myEmail:()=>email,isAdmin:true,clone:structuredClone,settingsData:{},settingsStamp:null,state:{halls:[],events:[]},versions:{},loaded:false,loadError:'',render(){},sb:{from:table=>({select(){return this},eq(){return this},maybeSingle:()=>Promise.resolve({data:{updated_at:'stamp',data:{halls:[],extra:'keep'}}}),then:resolve=>new Promise(r=>pending.push(r)).then(resolve)})}},part('function loadAll(','function loadTech('));
  const first=c.loadAll();await tick();const second=c.loadAll();await tick();
  pending[1]({data:[{id:'latest',data:{},version:2}]});await second;pending[0]({data:[{id:'old',data:{},version:1}]});await first;
  assert.equal(c.state.events[0].id,'latest');assert.equal(c.settingsData.extra,'keep');
  const third=c.loadAll();await tick();email='different';pending[2]({data:[{id:'wrong-account',data:{},version:3}]});await third;assert.equal(c.state.events[0].id,'latest');
 }
 async function authRace(){
- let email='admin',resolveRole;const c=ctx({authRequest:0,myEmail:()=>email,session:{},isAdmin:false,sb:{rpc:()=>new Promise(r=>resolveRole=r)},authReady:false},part('function checkAdmin(','var requests='));
+ let email='admin',resolveRole;const c=ctx({readDeadline:p=>p,authRequest:0,myEmail:()=>email,session:{},isAdmin:false,sb:{rpc:()=>new Promise(r=>resolveRole=r)},authReady:false},part('function checkAdmin(','var requests='));
  const p=c.checkAdmin();email='other';resolveRole({data:true});await p;assert.equal(c.isAdmin,false);assert.equal(c.authReady,false);
 }
 (async()=>{tasks();await tech();await checks();await settings();retainedFiles();await board();await authRace();console.log('PASS: task revisions, stale event/board/auth responses, serialized checks, network rollback, settings CAS, retained shared files')})().catch(e=>{console.error(e);process.exitCode=1});
