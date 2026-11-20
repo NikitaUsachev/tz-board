@@ -844,10 +844,11 @@ function boardView(){
 '';
 }
 function cardView(e){
+ var status=e.status||"draft";
  var halls=evHalls(e);
  var time=[e.mountDate&&e.mountDate!==e.date?"Монтаж "+fmtDate(e.mountDate,{day:"2-digit",month:"2-digit"}):"",e.rehearsal?"Прогоны "+(e.rehearsalDay==="mount"&&e.mountDate?fmtDate(e.mountDate,{day:"2-digit",month:"2-digit"})+" ":"с ")+e.rehearsal:"",e.end?"до "+e.end:""].filter(Boolean).join(" · ");
- return '<a class="card" href="#ev-'+esc(e.id)+'" data-card="'+esc(e.id)+'"'+(isAdmin?' draggable="true"':'')+'>'+
-  '<div class="card-date"><span class="d">'+(e.date?esc(fmtDate(e.date,{day:"2-digit",month:"2-digit",year:"numeric"})):"Дата не указана")+'</span><span class="w">'+esc(e.date?fmtDate(e.date,{weekday:"short"}):"")+'</span>'+(isPast(e.date)&&e.status!=="done"?'<span class="past">прошло</span>':'')+'</div>'+
+ return '<a class="card st-'+esc(status)+'" href="#ev-'+esc(e.id)+'" data-card="'+esc(e.id)+'"'+(isAdmin?' draggable="true"':'')+'>'+
+  '<div class="card-date"><span class="d">'+(e.date?esc(fmtDate(e.date,{day:"2-digit",month:"2-digit",year:"numeric"})):"Дата не указана")+'</span><span class="w">'+esc(e.date?fmtDate(e.date,{weekday:"short"}):"")+'</span>'+(isPast(e.date)&&status!=="done"?'<span class="past">прошло</span>':'')+'<span class="card-status">'+esc(stName(status))+'</span></div>'+
   '<h3>'+esc(e.title||"Без названия")+'</h3>'+
   (time?'<div class="time mono">'+esc(time)+'</div>':'')+
   (function(){var mg=(e.manager||"").trim(),pa=(e.padmin||"").trim();if(!mg&&!pa)return "";
