@@ -483,7 +483,7 @@ function readyButton(ev,h){
   var all=deptsFor(ev.id).length===DEPTS.length;
   return confirmed+'<p class="hint">Осталось отметить: '+esc(progress.remaining.join(", "))+'. '+(all?'':'<button class="linkbtn" data-act="dept" data-dept="all">Показать все отделы</button>')+'</p>';
  }
- return confirmed||'<button class="btn primary" data-act="tg-ready" data-h="'+esc(h.id)+'">Зал готов</button>';
+ return confirmed||(session?'<button class="btn primary" data-act="tg-ready" data-h="'+esc(h.id)+'">Зал готов</button>':'');
 }
 function sendHallReady(button,hall){
  var id=route(),name=myName();
@@ -565,7 +565,7 @@ function shortName(n){var p=String(n||"").trim().split(/\s+/);var f=p[0]?p[0].ch
 function fmtWhen(at){var d=new Date(at);if(isNaN(d))return "";var t=d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});var today=new Date();return d.toDateString()===today.toDateString()?t:d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" "+t}
 function setCheck(evid,item,done){
  var key=evid+"|"+item;if(checkPending[key]){paintChecks(evid,item);return}
- var name=myName();if(done&&!name)return;
+ var name=myName();if(!name)return;
  checkPending[key]=true;++checkRequest;
  var prev=checks[item];if(done)checks[item]={by:name,at:new Date().toISOString(),pending:true};else delete checks[item];checksKey="";paintChecks(evid,item);
  var arrival=item.indexOf("arrival:")===0;
@@ -965,7 +965,7 @@ function sheetView(id){
  if(isEdit){curDiff=null;curMarks={};return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+headView(ev,isEdit)+hallsView(ev,isEdit)+'</div>'+editBar()}
  if(checksFor!==ev.id){checksFor=ev.id;checks={};checksKey="";loadChecks(ev.id)}
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);if(curDiff)storeMarks(ev,curDiff);curMarks=activeMarks(ev);
- return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+'<div id="telegram-link">'+telegramLink(ev)+'</div>'+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
+ return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+(!session?'<p class="hint">Режим просмотра. Войдите как техник, чтобы ставить отметки.</p>':'')+'<div id="telegram-link">'+telegramLink(ev)+'</div>'+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return '';
@@ -1117,7 +1117,7 @@ function stageRead(b,k,evid){var L=specLines(b.spec);if(!L.length)return "";var 
  }).join('')+'</div>'}
 function itemPhases(evid,id,name,done){
  return '<div class="item-phases">'+[["arrival:"+id,"В зале"],[id,"Смонтировано"]].map(function(p){var c=done[p[0]],pending=checkPending[evid+"|"+p[0]];
- return '<label class="item-phase'+(c?' done':'')+'"><input type="checkbox" data-done="'+esc(evid)+'|'+esc(p[0])+'"'+(c?' checked':'')+(pending?' disabled':'')+' aria-label="'+esc(name+': '+p[1])+'"><span><b>'+p[1]+'</b><span class="who">'+(c?esc(c.by)+(c.at?' · '+esc(fmtWhen(c.at)):''):'Не отмечено')+'</span></span></label>';
+ return '<label class="item-phase'+(c?' done':'')+'"><input type="checkbox" data-done="'+esc(evid)+'|'+esc(p[0])+'"'+(c?' checked':'')+(!session||pending?' disabled':'')+' aria-label="'+esc(name+': '+p[1])+'"><span><b>'+p[1]+'</b><span class="who">'+(c?esc(c.by)+(c.at?' · '+esc(fmtWhen(c.at)):''):'Не отмечено')+'</span></span></label>';
  }).join('')+'</div>';
 }
 function catRead(ev,hid,c,done,col){
@@ -1131,7 +1131,7 @@ function catRead(ev,hid,c,done,col){
  var chief=chiefRead(b,k),staff=staffRead(b);
  return '<div class="cat cat-'+c.id+'">'+head+phases+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
   if(c.id!=="extra")return '<div class="equipment-item'+(m?' mk-'+m:'')+'"><div class="equipment-title"><b>'+esc(it.name)+badge(it.id)+'</b><span>'+esc(qtyStr(it.qty)||'')+'</span></div>'+((it.note||'').trim()?'<p class="equipment-note">'+esc(it.note)+'</p>':'')+itemPhases(ev.id,it.id,it.name,done)+'</div>';
-  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'<span class="who"></span>')+'</label>'}).join("")+'</div>':'')+staff+
+  return '<label class="row'+(d?" done":"")+(m?" mk-"+m:"")+'"><input type="checkbox" data-done="'+esc(ev.id)+'|'+esc(it.id)+'"'+(d?" checked":"")+(!session?' disabled':'')+'><span class="nm">'+esc(it.name)+badge(it.id)+'</span><span class="q">'+(it.qty?esc(qtyStr(it.qty)):"")+'</span>'+((it.note||"").trim()?'<span class="cm">'+esc(it.note)+'</span>':'')+(d?'<span class="who">✓ '+esc(shortName(done[it.id].by)||"отмечено")+(done[it.id].at?' · '+esc(fmtWhen(done[it.id].at)):'')+'</span>':'<span class="who"></span>')+'</label>'}).join("")+'</div>':'')+staff+
   ((b.note||"").trim()?'<p class="cat-note'+(curMarks["note|"+k]?" mk-changed":"")+'">'+esc(b.note)+'</p>':'')+'</div>';
 }
 function staffEdit(hid,c,b){var st=b.staff||[],at=function(i){return ' data-h="'+hid+'" data-c="'+c.id+'" data-i="'+i+'"'};
@@ -1575,7 +1575,7 @@ app.addEventListener("change",function(e){
  var t=e.target,d=t.dataset;
  if(t.id==="hall-navigation"&&t.value){var targetHall=t.value;t.value="";jumpToHall(targetHall);return}
  if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.hallNames=editing.hallNames||{};var picked=state.halls.filter(function(h){return h.id===id})[0];if(picked&&!editing.hallNames[id])editing.hallNames[id]=picked.name;editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
- if(d.done){var at=d.done.indexOf("|"),p=[d.done.slice(0,at),d.done.slice(at+1)];if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;openTechnician()}else setCheck(p[0],p[1],t.checked)}
+ if(d.done&&session){var at=d.done.indexOf("|"),p=[d.done.slice(0,at),d.done.slice(at+1)];if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;openTechnician()}else setCheck(p[0],p[1],t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
  if(d.upload&&editing&&t.files&&t.files.length){uploadFiles(d.upload,t.files);t.value=""}
 });
