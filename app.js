@@ -1064,7 +1064,7 @@ function staffRead(b){var st=staffOf(b);if(!st.length)return "";
  return '<div class="staff"><span class="eyebrow">Персонал</span>'+st.map(function(p){var m=curMarks[p.id];
   return '<div class="person'+(m?" mk-"+m:"")+'"><span class="p-role">'+esc(p.role||"—")+'</span><span class="p-name">'+esc(p.name||"—")+badge(p.id)+'</span>'+phoneHtml(p.phone)+'</div>'}).join("")+'</div>'}
 function specTasks(b){return stageSpecs(b).reduce(function(out,sp){return out.concat(sp.id?specLines(sp).map(function(x){return sp.id+":"+x[2]}):[])},[])}
-function stagesRead(b,k,evid){return stageSpecs(b).map(function(sp,i){if(!specLines(sp).length&&!sp.name&&!sp.location)return "";return '<section class="stage-unit"><div class="stage-unit-title"><b>'+esc(sp.name||("Сцена "+(i+1)))+'</b>'+(sp.location?'<span>'+esc(sp.location)+'</span>':'')+'</div>'+stageRead({spec:sp},k,evid)+'</section>'}).join("")}
+function stagesRead(b,k,evid){return stageSpecs(b).map(function(sp,i){if(!specLines(sp).length&&!String(sp.name||"").trim()&&!String(sp.location||"").trim())return "";return '<section class="stage-unit"><div class="stage-unit-title"><b>'+esc(sp.name||("Сцена "+(i+1)))+'</b>'+(sp.location?'<span>'+esc(sp.location)+'</span>':'')+'</div>'+stageRead({spec:sp},k,evid)+'</section>'}).join("")}
 function stageRead(b,k,evid){var L=specLines(b.spec);if(!L.length)return "";var m=curMarks["spec|"+k],sid=b.spec.id;
  return '<div class="stage-items'+(m?' mk-changed':'')+'">'+L.map(function(x){var tid=sid?sid+":"+x[2]:"";
  return '<div class="equipment-item"><div class="equipment-title"><b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span></div>'+(tid?itemPhases(evid,tid,x[0],checks):'')+'</div>';
@@ -1077,10 +1077,12 @@ function itemPhases(evid,id,name,done){
 function catRead(ev,hid,c,done,col){
  col=col||{};var b=ev.blocks[hid][c.id];var items=b.items.filter(function(i){return (i.name||"").trim()});var plots=c.id==="light"?plotsRead(b):c.id==="video"?linksRead(b):"";
  var k=hid+"|"+c.id,cc=!!col[k],n=blockCount(b),ch=markCount(ev,k);
+ var spec=c.id==="stage"?stagesRead(b,k,ev.id):"";
+ if(c.id==="stage"&&!items.length&&!spec&&!hasChief(b)&&!staffOf(b).length&&!(b.note||"").trim())return "";
  var head='<button class="cat-h cat-toggle" data-act="tog" data-k="'+k+'" aria-expanded="'+(!cc)+'"><span class="chev" aria-hidden="true">'+(cc?"▸":"▾")+'</span><b>'+c.name+'</b><span class="eyebrow">'+c.en+'</span>'+(ch?'<span class="chg chg-changed" title="Новые и изменённые пункты">'+ch+'</span>':'')+'<span class="n">'+(function(){var its=b.items.filter(function(i){return (i.name||"").trim()}).map(function(i){return {id:i.id}}).concat(specTasks(b).map(function(t){return {id:t}})),dn=its.filter(function(i){return checks[i.id]&&(c.id==="extra"||checks["arrival:"+i.id])}).length;return its.length?(dn?'<span class="prog'+(dn===its.length?" all":"")+'">✓ '+dn+'/'+its.length+'</span>':its.length+" поз."):(n?n+" поз.":"")})()+'</span></button>';
  var phases="";
  if(cc)return '<div class="cat cat-'+c.id+' closed">'+head+phases+'</div>';
- var chief=chiefRead(b,k),staff=staffRead(b),spec=c.id==="stage"?stagesRead(b,k,ev.id):"";
+ var chief=chiefRead(b,k),staff=staffRead(b);
  if(!items.length&&!plots&&!spec&&!chief&&!staff&&!(b.note||"").trim())return c.id==="extra"?'':'<div class="cat cat-'+c.id+' empty">'+head+'<p class="none">Не требуется</p></div>';
  return '<div class="cat cat-'+c.id+'">'+head+phases+chief+spec+plots+(items.length?'<div class="rows">'+items.map(function(it){var d=!!done[it.id],m=curMarks[it.id];
   if(c.id!=="extra")return '<div class="equipment-item'+(m?' mk-'+m:'')+'"><div class="equipment-title"><b>'+esc(it.name)+badge(it.id)+'</b><span>'+esc(qtyStr(it.qty)||'')+'</span></div>'+((it.note||'').trim()?'<p class="equipment-note">'+esc(it.note)+'</p>':'')+itemPhases(ev.id,it.id,it.name,done)+'</div>';
