@@ -1210,6 +1210,24 @@ function modalView(){
 /* ---------- auth screen ---------- */
 var AUTH_ERR={"Invalid login credentials":"Неверная почта или пароль.","Email not confirmed":"Почта ещё не подтверждена. Откройте письмо от Supabase и нажмите ссылку подтверждения.","User already registered":"Этот адрес уже зарегистрирован. Войдите или восстановите пароль.","Password should be at least 6 characters.":"Пароль слишком короткий."};
 function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m])return AUTH_ERR[m];if(/email rate limit/i.test(m))return "Лимит писем исчерпан: достигнуто ограничение отправки писем. Попробуйте позже; если ошибка повторится, администратору нужно проверить SMTP и лимиты Auth.";if(/rate|limit|seconds/i.test(m))return "Слишком много попыток. Подождите минуту и попробуйте снова.";return m}
+var signingOut=false;
+async function signOut(){
+ if(signingOut||!session)return;
+ if(editing&&dirty&&!persistDraft())return;
+ var wasAdmin=isAdmin;
+ signingOut=true;
+ try{
+  var result=await sb.auth.signOut({scope:"local"});
+  if(result.error)throw result.error;
+  session=null;modal=null;pendingCheck=null;editing=null;
+  auth.tab="in";auth.err="";auth.msg="";
+  if(wasAdmin&&route())history.replaceState(null,"",location.pathname);
+  var technicianRoute=route();
+  await checkAdmin();
+  if(technicianRoute&&route()===technicianRoute&&!session)openTechnician();
+ }catch(error){toast("Не удалось выйти: "+authErr(error))}
+ finally{signingOut=false}
+}
 function openTechnician(){
  modal=session?{t:"me"}:{t:"tech-auth",mode:"in",email:"",name:""};
  render();
@@ -1384,7 +1402,7 @@ app.addEventListener("click",function(e){
   case "releases":if(isAdmin){markReleaseRead();modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
   case "recheck":checkAdmin();break;
   case "account":if(isAdmin){modal=Object.assign({t:"account"},accountProfile());render()}break;
-  case "logout":sb.auth.signOut().then(function(){modal=null;editing=null;auth.tab="in";if(route()&&isAdmin){history.replaceState(null,"",location.pathname)}toast("Вы вышли")});break;
+  case "logout":signOut();break;
   case "new":var ev=newEvent(d.st);if(!startEdit(ev))break;editing._new=true;location.hash="ev-"+ev.id;break;
   case "edit":var x=evById(d.id);if(x&&startEdit(x)){render()}break;
   case "cancel":if(dirty){exitArmed=true;render()}else leaveEdit();break;
@@ -1597,6 +1615,7 @@ render();
 window.TZ_APP_STARTED=true;
 startSession();
 sb.auth.onAuthStateChange(function(ev,s){
+ if(ev==="SIGNED_OUT"&&signingOut)return;
  var prev=session&&session.user&&session.user.id;session=s||null;
  if(ev==="PASSWORD_RECOVERY"){modal={t:"newpass"};}
  if(ev!=="TOKEN_REFRESHED")cleanAuthHash();
