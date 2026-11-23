@@ -87,6 +87,13 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  assert.doesNotMatch(signedInTech.app.innerHTML,/data-act="logout"|id="auth-form"/);
  assert.equal(signedInTech.authCalls.find(call=>call.op==='out').p.scope,'local');
 
+ for(const signOutError of [{name:'AuthSessionMissingError',message:'Auth session missing!'},{message:'Auth session missing!'}]){
+  const staleLogout=await boot(false,false,false,[],{...signOutOptions,signOutError});
+  staleLogout.click('logout');await tick();await tick();
+  assert.equal(staleLogout.c.location.hash,'#ev-E');
+  assert.match(staleLogout.app.innerHTML,/id="tech-auth-form"/);
+  assert.doesNotMatch(staleLogout.app.innerHTML,/data-act="logout"|class="technician-name"/);
+ }
  const failedLogout=await boot(false,false,false,[],{...signOutOptions,signOutError:{message:'Ошибка сети'}});
  failedLogout.click('logout');await tick();
  assert.match(failedLogout.app.innerHTML,/data-act="logout"/);
