@@ -830,13 +830,15 @@ function topBar(){
  var mode=isAdmin?'<span class="mode admin">Администратор</span>':'';
  var onBoard=!route()&&isAdmin;
  var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
+ var technician=!!(route()&&session&&!isAdmin);
  if(route()&&!isAdmin){
   var technicianName=myName();
-  auth=session?'<div class="technician-account">'+(technicianName?'<span class="technician-name">'+esc(technicianName)+'</span>':'')+
-   '<button class="btn sm technician-profile" data-act="tech-profile">Личный кабинет</button><button class="btn ghost sm" data-act="logout">Выйти</button></div>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
+  auth=technician?'<button type="button" class="btn sm technician-profile" data-act="tech-profile"'+(technicianName?' aria-label="Профиль: '+esc(technicianName)+'"':'')+'>'+
+   '<span class="technician-profile-icon" aria-hidden="true"></span><span class="technician-profile-label"><strong>Профиль</strong><span class="technician-name">'+esc(technicianName||"Указать имя")+'</span></span></button>':
+   '<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
  }
- return '<header class="top"><div class="top-in gut">'+
-  '<div class="brand"><h1>ТЗ на мероприятия | Серп и Молот</h1>'+mode+'</div>'+
+ return '<header class="top'+(technician?' technician-header':'')+'"><div class="top-in gut">'+
+  '<div class="brand">'+(technician?'<h1>ТЗ мероприятий</h1><span class="technician-brand-sub">Серп и Молот</span>':'<h1>ТЗ на мероприятия | Серп и Молот</h1>')+mode+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
   (isAdmin?'<button class="btn" data-act="settings">Настройки'+(pendingCount()?'<span class="req-n" aria-label="Новых заявок: '+pendingCount()+'">'+pendingCount()+'</span>':'')+'</button>':'')+
   (isAdmin&&onBoard?'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'')+
@@ -1187,7 +1189,7 @@ function modalView(){
  if(modal.t==="tech-auth")return wrap(technicianForm(modal),"Вход техника");
  if(modal.t==="me"){
   var title=modal.profile?"Личный кабинет":"Как вас зовут?";
-  return wrap('<h2>'+title+'</h2><form id="me-form" class="halls-row"><label class="fld full"><span>Имя и фамилия</span><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(modal.name??myName())+'"></label><p class="hint">Это имя будет видно рядом с новыми отметками.</p>'+(modal.error?'<p class="auth-err" role="alert">'+esc(modal.error)+'</p>':'')+'<div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Закрыть</button><button type="submit" class="btn primary"'+(modal.busy?' disabled':'')+'>Сохранить</button></div></form>',title);
+  return wrap('<h2>'+title+'</h2><form id="me-form" class="halls-row"><label class="fld full"><span>Имя и фамилия</span><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(modal.name??myName())+'"></label><p class="hint">Это имя будет видно рядом с новыми отметками.</p>'+(modal.error?'<p class="auth-err" role="alert">'+esc(modal.error)+'</p>':'')+'<div class="bar">'+(modal.profile?'<button type="button" class="btn ghost danger" data-act="logout">Выйти</button>':'')+'<span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Закрыть</button><button type="submit" class="btn primary"'+(modal.busy?' disabled':'')+'>Сохранить</button></div></form>',title);
  }
  if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(DEPTS.map(function(c){return {d:c.id,n:c.name}}));
   return wrap('<h2>Ссылки для техников</h2><p class="hint">Ссылка отдела сразу открывает только его блоки. Техник может переключить отдел сам.</p><div class="linkopts">'+opts.map(function(o){var u=linkFor(modal.id,o.d),iid="lk-"+(o.d||"all");
