@@ -797,10 +797,27 @@ function copyText(text){
  else{modal={t:"copy",text:text};render()}
 }
 
+function schemeFiles(ev){
+ return ((ev.docs||{}).scheme||[]).filter(function(f){return f.path});
+}
+function openScheme(){
+ var id=route(),ev=editing&&editing.id===id?editing:evById(id);
+ if(!ev)return;
+ var files=schemeFiles(ev);
+ if(!files.length)return;
+ var dialog=document.createElement("dialog");
+ dialog.className="scheme-dialog";
+ dialog.setAttribute("aria-labelledby","scheme-dialog-title");
+ dialog.innerHTML='<form method="dialog"><h2 id="scheme-dialog-title">Общая схема</h2><button class="btn sm" autofocus>Закрыть</button></form>'+filesRead(files,"");
+ dialog.addEventListener("close",function(){dialog.remove()},{once:true});
+ document.body.appendChild(dialog);
+ dialog.showModal();
+}
 function sheetNavigation(){
  var id=route(),ev=editing&&editing.id===id?editing:evById(id);
  if(!id||!ev)return "";
- return '<nav class="sheet-navigation" aria-label="Навигация по ТЗ"><select id="hall-navigation" aria-label="Перейти к залу"><option value="">Перейти к залу…</option>'+evHalls(ev).map(function(h){return '<option value="'+esc(h.id)+'">'+esc(h.name)+'</option>'}).join("")+'</select><button class="btn sm" data-act="sheet-top">↑ Наверх</button></nav>';
+ var hasScheme=schemeFiles(ev).length>0;
+ return '<nav class="sheet-navigation'+(hasScheme?' has-scheme':'')+'" aria-label="Навигация по ТЗ"><select id="hall-navigation" aria-label="Перейти к залу"><option value="">Перейти к залу…</option>'+evHalls(ev).map(function(h){return '<option value="'+esc(h.id)+'">'+esc(h.name)+'</option>'}).join("")+'</select>'+(hasScheme?'<button class="btn sm scheme-open" data-act="sheet-scheme">Схема</button>':'')+'<button class="btn sm" data-act="sheet-top" aria-label="Наверх">↑<span> Наверх</span></button></nav>';
 }
 function jumpToHall(id){
  var evid=route(),col=evid&&collapsed(evid);
@@ -1318,6 +1335,7 @@ app.addEventListener("click",function(e){
   case "tog":var evt=route();if(!evt)break;var cl=collapsed(evt);if(cl[d.k])delete cl[d.k];else cl[d.k]=1;ls.set("tz-col-"+evt,cl);render();break;
   case "ack":var eva=evById(d.id);if(eva){markSeen(eva);curDiff=null;flagTitle(false);render();toast("Список скрыт. Метки «Новое» останутся до выполнения")}break;
   case "jump":jumpToHall(d.h);break;
+  case "sheet-scheme":openScheme();break;
   case "sheet-top":window.scrollTo({top:0,behavior:"smooth"});break;
   case "picker":pickerOpen=!pickerOpen;render();break;
   case "unhall":editing.halls=editing.halls.filter(function(h){return h!==d.h});dirty=true;render();break;
