@@ -9,9 +9,10 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  const checks=new Map();window.calls=[];window.failNext=false;
  const ev={id:'E',title:'Проверка этапов монтажа',date:'2026-11-17',status:'prep',halls:['h'],hallNames:{h:'Большой зал'},blocks:{h:{}}};
  for(const c of ['sound','light','video','stage'])ev.blocks.h[c]={items:[{id:c+'-one',name:c==='sound'?'Радиомикрофон':'Оборудование',qty:'4'}]};
- window.TZ_CONFIG={url:'test',key:'test'};localStorage.setItem('tz-me',JSON.stringify('Иванов Иван'));
- window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange(){}},rpc:async(name,p)=>{
+ window.TZ_CONFIG={url:'test',key:'test'};
+ window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:'technician',email:'tech@example.com',user_metadata:{technician_name:'Иванов Иван'}}}}}),onAuthStateChange(){}},rpc:async(name,p)=>{
  window.calls.push({name,p});
+ if(name==='is_admin')return {data:false};
  if(name==='get_event_v2'||name==='get_event')return {data:[{id:'E',data:ev,version:1}]};
  if(name==='get_checks')return {data:[...checks.values()]};
  if(name==='set_item_arrival'||name==='set_check'){
