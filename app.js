@@ -255,7 +255,7 @@ function curTheme(){var t=document.documentElement.getAttribute("data-theme");if
 function applyTheme(t){document.documentElement.setAttribute("data-theme",t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#151C26":"#FFFFFF")}
 (function(){var s=ls.get("tz-theme");if(s==="dark"||s==="light")applyTheme(s)})();
 if(mq){var onMq=function(){if(!ls.get("tz-theme"))render()};if(mq.addEventListener)mq.addEventListener("change",onMq);else if(mq.addListener)mq.addListener(onMq)}
-function themeBtn(){var d=curTheme()==="dark";return '<button class="btn ghost sm theme-btn" data-act="theme" aria-label="'+(d?"Включить светлую тему":"Включить тёмную тему")+'" title="'+(d?"Светлая тема":"Тёмная тема")+'"><span class="ic" aria-hidden="true">'+(d?"☀":"☾")+'</span><span class="lbl">'+(d?"Светлая":"Тёмная")+'</span></button>'}
+function themeBtn(compact){var d=curTheme()==="dark";return '<button class="btn ghost sm theme-btn" data-act="theme" aria-label="'+(d?"Включить светлую тему":"Включить тёмную тему")+'" title="'+(d?"Светлая тема":"Тёмная тема")+'"><span class="ic" aria-hidden="true">'+(d?(compact?"☀︎":"☀"):"☾")+'</span><span class="lbl">'+(d?"Светлая":"Тёмная")+'</span></button>'}
 
 function hallById(id,ev){
  ev=ev||editing||evById(route());
@@ -829,7 +829,9 @@ function jumpToHall(id){
 function topBar(){
  var mode=isAdmin?'<span class="mode admin">Администратор</span>':'';
  var onBoard=!route()&&isAdmin;
- var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
+ var name=isAdmin?accountLabel():"";
+ var auth=isAdmin?'<button class="btn ghost sm'+(onBoard?' admin-board-profile':'')+'" data-act="account" title="'+esc(myEmail())+'"'+(onBoard?' aria-label="Профиль: '+esc(name)+'"':'')+'>'+
+  (onBoard?'<span class="admin-board-profile-title">Профиль</span><span class="admin-board-profile-name">'+esc(name)+'</span>':esc(name))+'</button>':'';
  var technician=!!(route()&&session&&!isAdmin);
  if(route()&&!isAdmin){
   var technicianName=myName();
@@ -839,12 +841,17 @@ function topBar(){
  }
  var sheet=route()&&!editing?evById(route()):null;
  var status=sheet&&!sheet.deletedAt?'<span class="pill st-'+esc(sheet.status||"draft")+' mobile-sheet-status">'+esc(stName(sheet.status||"draft"))+'</span>':'';
- return '<header class="top'+(technician?' technician-header':'')+'"><div class="top-in gut">'+
-  '<div class="brand">'+(technician?'<h1>ТЗ мероприятий</h1><span class="technician-brand-sub">Серп и Молот</span>':'<h1>ТЗ на мероприятия | Серп и Молот</h1>')+mode+status+'</div>'+
-  (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
-  (isAdmin?'<button class="btn" data-act="settings">Настройки'+(pendingCount()?'<span class="req-n" aria-label="Новых заявок: '+pendingCount()+'">'+pendingCount()+'</span>':'')+'</button>':'')+
-  (isAdmin&&onBoard?'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'')+
-  themeBtn()+auth+sheetNavigation()+
+ var brand=onBoard?'<h1><span class="admin-board-title">ТЗ на мероприятия | Серп и Молот</span><span class="admin-board-short-title">ТЗ мероприятий</span></h1>':
+  technician?'<h1>ТЗ мероприятий</h1><span class="technician-brand-sub">Серп и Молот</span>':'<h1>ТЗ на мероприятия | Серп и Молот</h1>';
+ var pending=isAdmin?pendingCount():0;
+ var settings=isAdmin?'<button class="btn" data-act="settings"'+(onBoard?' aria-label="Настройки'+(pending?', новых заявок: '+pending:'')+'"':'')+'>'+
+  (onBoard?'<span class="admin-board-settings-label">Настройки</span><span class="admin-board-settings-icon" aria-hidden="true">⚙︎</span>':'Настройки')+
+  (pending?'<span class="req-n" aria-label="Новых заявок: '+pending+'">'+pending+'</span>':'')+'</button>':'';
+ var boardControls=onBoard?'<input id="q" class="search" type="search" placeholder="Поиск" value="'+esc(query)+'" aria-label="Поиск по названию или залу">'+
+  settings+'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'';
+ return '<header class="top'+(technician?' technician-header':'')+(onBoard?' admin-board-header':'')+'"><div class="top-in gut">'+
+  '<div class="brand">'+brand+mode+status+'</div>'+
+  (onBoard?themeBtn(true)+auth+boardControls:settings+themeBtn()+auth+sheetNavigation())+
  '</div></header>'+conflictBanner();
 }
 function conflictBanner(){
