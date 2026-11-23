@@ -21,7 +21,7 @@ test('Existing per-item check becomes installed, arrival stays independent',asyn
  assert.equal((html.match(/ checked/g)||[]).length,1);assert.match(html,/Иванов Иван &lt;x&gt;/);assert.match(html,/Смонтировано/);
 });
 test('Arrival uses dedicated RPC; installation retains original item check',async()=>{
- const {c,rpcCalls}=await boot(false,false,false,[],{storage:{'tz-me':JSON.stringify('Иванов Иван')}}),t=c.__test;
+ const {c,rpcCalls}=await boot(false,false,false,[],{role:false,getSession:async()=>({data:{session:{user:{id:'tech',email:'tech@example.com',user_metadata:{technician_name:'Иванов Иван'}}}}})}),t=c.__test;
  t.setCheck('E','arrival:item',true);await tick();
  const call=rpcCalls.find(x=>x.name==='set_item_arrival');assert.equal(call.args.p_item,'item');assert.equal(call.args.p_by,'Иванов Иван');
  t.setCheck('E','item',true);await tick();assert.ok(rpcCalls.some(x=>x.name==='set_check'));
