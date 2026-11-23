@@ -365,6 +365,7 @@ function linksEdit(hid,c,b){
 }
 function fmtDate(d,opt){if(!d)return "";var dt=new Date(d+"T00:00:00");if(isNaN(dt))return d;return dt.toLocaleDateString("ru-RU",opt||{day:"numeric",month:"long"})}
 function isPast(d){if(!d)return false;var t=new Date();t.setHours(0,0,0,0);return new Date(d+"T00:00:00")<t}
+function technicianHome(){return location.hash==="#tech"}
 function route(){var h=location.hash.slice(1);return h.indexOf("ev-")===0?h.slice(3).split("~")[0]:null}
 function hashDept(){var m=/~(sound|light|video)$/.exec(location.hash);return m?m[1]:null}
 function go(id){if(id){location.hash="ev-"+id}else{if(location.hash){history.pushState(null,"",location.pathname+location.search)}render()}}
@@ -580,7 +581,7 @@ function setCheck(evid,item,done){
 }
 setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
 var reloadT;
-function scheduleReload(){clearTimeout(reloadT);reloadT=setTimeout(function(){if(isAdmin){loadAll();loadRequests().then(function(){if(!editing&&!modal)render()})}else if(route())loadTech(route())},400)}
+function scheduleReload(){clearTimeout(reloadT);reloadT=setTimeout(function(){if(isAdmin){loadAll();loadRequests().then(function(){if(!editing&&!modal)render()})}else if(route())loadTech(route());else if(technicianHome()&&myName())loadTechnicianEvents()},400)}
 function subscribe(){
  if(rtChannel)return;
  try{rtChannel=sb.channel("tz").on("postgres_changes",{event:"*",schema:"public",table:"events"},scheduleReload)
@@ -595,9 +596,10 @@ function checkAdmin(){
   if(!current())return;
   startupError="";authReady=true;loaded=false;
   if(isAdmin){subscribe();loadAdmins().catch(function(){});loadRequests().then(function(){if(!editing&&!modal)render()}).catch(function(){});return loadAll()}
-  if(session&&!route())sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()}).catch(function(){});
+  if(session&&!route()&&!technicianHome()&&!myName())sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()}).catch(function(){});
   unsubscribe();admins=[];state.events=[];state.halls=[];legacyHalls=[];settingsData={};settingsStamp=null;versions={};editing=null;if(modal&&modal.t==="settings")modal=null;
   if(route())return loadTech(route());
+  if(technicianHome()&&myName())return loadTechnicianEvents();
   loaded=true;render();
  }).catch(function(error){if(!current())return;startupError="Не удалось проверить права доступа. Проверьте соединение и повторите.";authReady=false;render()});
 }
@@ -832,8 +834,8 @@ function topBar(){
  var name=isAdmin?accountLabel():"";
  var auth=isAdmin?'<button class="btn ghost sm'+(onBoard?' admin-board-profile':'')+'" data-act="account" title="'+esc(myEmail())+'"'+(onBoard?' aria-label="Профиль: '+esc(name)+'"':'')+'>'+
   (onBoard?'<span class="admin-board-profile-title">Профиль</span><span class="admin-board-profile-name">'+esc(name)+'</span>':esc(name))+'</button>':'';
- var technician=!!(route()&&session&&!isAdmin);
- if(route()&&!isAdmin){
+ var technician=!!((route()||technicianHome())&&session&&!isAdmin);
+ if((route()||technicianHome())&&!isAdmin){
   var technicianName=myName();
   auth=technician?'<button type="button" class="btn sm technician-profile" data-act="tech-profile"'+(technicianName?' aria-label="Профиль: '+esc(technicianName)+'"':'')+'>'+
    '<span class="technician-profile-icon" aria-hidden="true"></span><span class="technician-profile-label"><strong>Профиль</strong><span class="technician-name">'+esc(technicianName||"Указать имя")+'</span></span></button>':
@@ -862,6 +864,72 @@ function conflictBanner(){
 }
 
 /* ---------- board ---------- */
+var technicianEvents=null,technicianListOwner=null,technicianListError="",technicianListRequest=0;
+var technicianView=ls.get("tz-tech-view")==="calendar"?"calendar":"board",technicianDate=null;
+function loadTechnicianEvents(){
+ var owner=session?.user.id;
+ if(!owner||!myName()||!technicianHome()||isAdmin)return;
+ var request=++technicianListRequest;
+ if(technicianListOwner!==owner){technicianEvents=null;technicianListError="";technicianListOwner=owner}
+ if(!technicianEvents)render();
+ return readDeadline(sb.rpc("list_technician_events"),"список ТЗ").then(function(result){
+  if(request!==technicianListRequest||session?.user.id!==owner||!technicianHome())return;
+  if(result.error)throw result.error;
+  var events=(result.data||[]).filter(function(e){return e.status==="prep"||e.status==="ready"});
+  var changed=technicianListError||JSON.stringify(events)!==JSON.stringify(technicianEvents);
+  technicianEvents=events;technicianListError="";
+  if(changed&&!modal)render();
+ }).catch(function(error){
+  if(request!==technicianListRequest||session?.user.id!==owner||!technicianHome())return;
+  technicianListError=error.message||"Проверьте соединение.";
+  if(!modal)render();
+ });
+}
+function technicianDayString(day){
+ return day.getFullYear()+"-"+String(day.getMonth()+1).padStart(2,"0")+"-"+String(day.getDate()).padStart(2,"0");
+}
+function technicianEventCard(event,mount){
+ var date=mount?event.mount_date:event.event_date;
+ var details=[mount?"Монтаж":event.start_time,date?fmtDate(date):"",...(event.hall_names||[])].filter(Boolean);
+ return '<a class="card st-'+esc(event.status)+'" href="#ev-'+esc(event.id)+'"><span class="pill st-'+esc(event.status)+'">'+esc(stName(event.status))+'</span><h3>'+
+  esc(event.title||"Без названия")+'</h3>'+(details.length?'<span class="time">'+esc(details.join(" · "))+'</span>':'')+'</a>';
+}
+function technicianCalendar(events){
+ var today=technicianDayString(new Date());
+ if(!technicianDate)technicianDate=today;
+ var monday=new Date(technicianDate+"T12:00:00");
+ monday.setDate(monday.getDate()-(monday.getDay()+6)%7);
+ var sunday=new Date(monday);sunday.setDate(sunday.getDate()+6);
+ var days=Array.from({length:7},function(_,i){
+  var day=new Date(monday);day.setDate(monday.getDate()+i);
+  var key=technicianDayString(day),busy=events.some(function(e){return e.event_date===key||e.mount_date===key});
+  return '<button type="button" class="btn technician-day'+(busy?' busy':'')+'" data-act="tech-day" data-day="'+key+'" aria-label="'+esc(fmtDate(key,{weekday:"long",day:"numeric",month:"long"})+(busy?", есть ТЗ":""))+'" aria-pressed="'+(key===technicianDate)+'"'+(key===today?' aria-current="date"':'')+'><span>'+esc(fmtDate(key,{weekday:"short"}))+'</span><b>'+day.getDate()+'</b></button>';
+ }).join("");
+ var rows=events.flatMap(function(e){
+  if(e.event_date===technicianDate)return [technicianEventCard(e,false)];
+  return e.mount_date===technicianDate?[technicianEventCard(e,true)]:[];
+ }).join("");
+ return '<div class="technician-week-bar"><button class="btn" data-act="tech-week" data-step="-7" aria-label="Предыдущая неделя">‹</button><strong>'+
+  esc(fmtDate(technicianDayString(monday))+" – "+fmtDate(technicianDayString(sunday)))+
+  '</strong><button class="btn" data-act="tech-week" data-step="7" aria-label="Следующая неделя">›</button><button class="btn" data-act="tech-today">Сегодня</button></div>'+
+  '<div class="technician-week" role="group" aria-label="Дни недели">'+days+'</div><h2 class="technician-date">'+esc(fmtDate(technicianDate,{weekday:"long",day:"numeric",month:"long"}))+
+  '</h2><div class="technician-event-list">'+(rows||'<p class="empty-col">На этот день ТЗ нет</p>')+'</div>';
+}
+function technicianHomeView(){
+ var header=topBar()+'<main class="sheet gut technician-home"><h2>Мои ТЗ</h2>';
+ if(!myName())return header+'<p>Войдите как техник, чтобы увидеть доступные ТЗ.</p><button class="btn primary" data-act="tech-login">'+(session?"Указать имя":"Войти как техник")+'</button></main>';
+ var tabs='<div class="seg" role="group" aria-label="Вид списка ТЗ">'+["board","calendar"].map(function(v){
+  var active=technicianView===v;
+  return '<button data-act="tech-view" data-view="'+v+'" class="'+(active?'on':'')+'" aria-pressed="'+active+'">'+(v==="board"?"Доска":"Календарь")+'</button>';
+ }).join("")+'</div>';
+ var error=technicianListError?'<p class="hint" role="status">Не удалось обновить ТЗ. <button class="btn sm" data-act="tech-list-retry">Повторить</button></p>':'';
+ if(technicianListOwner!==session.user.id||!technicianEvents)return header+tabs+(error||'<p class="hint">Загрузка ТЗ…</p>')+'</main>';
+ if(technicianView==="calendar")return header+tabs+error+technicianCalendar(technicianEvents)+'</main>';
+ return header+tabs+error+'<div class="technician-board">'+STATUSES.filter(function(s){return s.id==="prep"||s.id==="ready"}).map(function(s){
+  var cards=technicianEvents.filter(function(e){return e.status===s.id}).map(function(e){return technicianEventCard(e,false)}).join("");
+  return '<section class="col st-'+s.id+'"><div class="col-h"><span class="dot"></span><h2>'+s.name+'</h2></div>'+(cards||'<p class="empty-col">Пока пусто</p>')+'</section>';
+ }).join("")+'</div></main>';
+}
 function boardView(){
  if(!loaded)return topBar()+'<div class="sheet gut"><div class="no-halls">Загрузка…</div></div>';
  if(loadError)return topBar()+'<div class="sheet gut"><div class="no-halls">Не удалось загрузить ТЗ: '+esc(loadError)+'<br><br><button class="btn" data-act="retry">Повторить</button></div></div>';
@@ -980,7 +1048,7 @@ function sheetView(id){
  return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+(!session?'<p class="hint">Режим просмотра. Войдите как техник, чтобы ставить отметки.</p>':'')+'<div id="telegram-link">'+telegramLink(ev)+'</div>'+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 function sheetBar(ev,isEdit){
- if(!isAdmin)return '';
+ if(!isAdmin)return session?'<div class="bar"><a class="btn sm" href="#tech">← Мои ТЗ</a></div>':'';
  var h='<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button><span class="sp"></span>';
  if(isEdit){h+='<label class="eyebrow" for="f-status">Статус</label><select id="f-status" data-f="status">'+STATUSES.map(function(s){return '<option value="'+s.id+'"'+(ev.status===s.id?" selected":"")+'>'+s.name+'</option>'}).join("")+'</select>'}
  else{
@@ -1243,9 +1311,9 @@ async function signOut(){
   session=null;modal=null;pendingCheck=null;editing=null;
   auth.tab="in";auth.err="";auth.msg="";
   if(wasAdmin&&route())history.replaceState(null,"",location.pathname);
-  var technicianRoute=route();
+  var technicianRoute=location.hash;
   await checkAdmin();
-  if(technicianRoute&&route()===technicianRoute&&!session)openTechnician();
+  if(technicianRoute&&location.hash===technicianRoute&&!session)openTechnician();
  }catch(error){toast("Не удалось выйти: "+authErr(error))}
  finally{signingOut=false}
 }
@@ -1272,7 +1340,7 @@ function technicianRedirect(){
 }
 async function submitTechnician(){
  var form=modal;
- if(!form||form.t!=="tech-auth"||form.busy||!route())return;
+ if(!form||form.t!=="tech-auth"||form.busy||(!route()&&!technicianHome()))return;
  var email=document.getElementById("tech-email").value.trim(),password=document.getElementById("tech-password")?.value;
  var name=(document.getElementById("tech-name")?.value||"").trim().replace(/\s+/g," ");
  form.email=email;form.name=name;form.error="";form.message="";
@@ -1300,11 +1368,12 @@ function finishTechnicianLogin(activeSession){
  if(pc&&pc.ev===route()&&!myName()){modal={t:"me"};render();return}
  pendingCheck=null;modal=null;render();
  if(pc&&pc.ev===route())setCheck(pc.ev,pc.item,pc.done);
+ if(technicianHome()&&myName())loadTechnicianEvents();
 }
 function authView(){
  var h='<div class="auth gut"><div class="auth-top">'+themeBtn()+'</div><div class="auth-card"><div class="auth-brand"><span class="eyebrow">Техническое обеспечение мероприятий</span><h1>ТЗ на мероприятия | Серп и Молот</h1></div>';
  if(session&&!isAdmin&&session.user.user_metadata?.technician_name){
-  h+='<p>Вы вошли как техник.</p><p>Откройте ссылку на ТЗ, которую прислал администратор.</p><button class="btn" data-act="logout">Выйти</button>';
+  h+='<p>Вы вошли как техник.</p><a class="btn primary" href="#tech">Мои ТЗ</a><button class="btn" data-act="logout">Выйти</button>';
  }else if(session&&!isAdmin){
   h+='<p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+(reqStatus==="rejected"?'<p class="req-state rej"><b>Заявка отклонена.</b> Если это ошибка, свяжитесь с администратором.</p>':'<p class="req-state"><b>Заявка отправлена.</b> Администратор увидит её в «Настройках» и подтвердит доступ. После этого нажмите «Проверить снова».</p>')+''+
    '<div class="bar"><button class="btn danger" data-act="logout">Выйти</button><span class="sp"></span><button class="btn primary" data-act="recheck">Проверить снова</button></div>';
@@ -1346,6 +1415,7 @@ function render(){
  if(!authReady)body='<div class="sheet gut"><div class="no-halls">'+(startupError?esc(startupError)+'<br><br><button class="btn" data-act="retry-start">Повторить загрузку</button>':'Проверяем вход…')+'</div></div>';
  else if(isAdmin)body=id?sheetView(id):boardView();
  else if(id)body=sheetView(id);
+ else if(technicianHome())body=technicianHomeView();
  else body=authView();
  app.classList.toggle("admin-layout",isAdmin&&!id);
  if(editing&&dirty)persistDraft();
@@ -1418,7 +1488,12 @@ app.addEventListener("click",function(e){
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
   case "tech-profile":if(route()&&session&&!isAdmin){modal={t:"me",profile:true};render();document.getElementById("me-in")?.focus()}break;
-  case "tech-login":if(route()&&!isAdmin)openTechnician();break;
+  case "tech-login":if((route()||technicianHome())&&!isAdmin)openTechnician();break;
+  case "tech-list-retry":loadTechnicianEvents();break;
+  case "tech-view":technicianView=d.view;ls.set("tz-tech-view",d.view);render();break;
+  case "tech-day":technicianDate=d.day;render();document.querySelector('[data-day="'+d.day+'"]')?.focus();break;
+  case "tech-today":technicianDate=technicianDayString(new Date());render();break;
+  case "tech-week":var next=new Date((technicianDate||technicianDayString(new Date()))+"T12:00:00");next.setDate(next.getDate()+Number(d.step));technicianDate=technicianDayString(next);render();break;
   case "tech-tab":if(modal?.t==="tech-auth"&&!modal.busy){modal.mode=d.mode;modal.error="";modal.message="";render()}break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
   case "releases":if(isAdmin){markReleaseRead();modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
@@ -1628,13 +1703,14 @@ window.addEventListener("hashchange",function(){
  }
  pickerOpen=false;
  if(authReady&&!isAdmin&&id&&!evById(id)){loaded=false;loadTech(id)}
+ if(authReady&&!isAdmin&&technicianHome()&&myName())loadTechnicianEvents();
  render();window.scrollTo(0,0);
 });
 
 /* ---------- boot ---------- */
 function cleanAuthHash(){
  var params=new URLSearchParams(location.search),target=params.get("tech_return");
- if(target&&/^ev-[a-z0-9_-]{1,80}(?:~(?:sound|light|video))?$/i.test(target)){
+ if(target&&(target==="tech"||/^ev-[a-z0-9_-]{1,80}(?:~(?:sound|light|video))?$/i.test(target))){
   params.delete("tech_return");
   history.replaceState(null,"",location.pathname+(params.size?"?"+params.toString():"")+"#"+target);
  }else if(/access_token=|error_description=|type=recovery/.test(location.hash)){
@@ -1658,6 +1734,7 @@ sb.auth.onAuthStateChange(function(ev,s){
 });
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&!editing&&authReady)scheduleReload()});
 setInterval(function(){if(authReady&&!isAdmin&&route()&&!document.hidden)loadTech(route())},60000);
+setInterval(function(){if(authReady&&technicianHome()&&!document.hidden&&myName())loadTechnicianEvents()},15000);
 })();
 
 
