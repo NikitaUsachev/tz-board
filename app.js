@@ -1221,7 +1221,9 @@ async function signOut(){
  signingOut=true;
  try{
   var result=await sb.auth.signOut({scope:"local"});
-  if(result.error)throw result.error;
+  var error=result.error;
+  // An already missing session is the same end state as a successful logout.
+  if(error&&error.name!=="AuthSessionMissingError"&&error.code!=="session_not_found"&&!/^Auth session missing!?$/i.test(error.message||""))throw error;
   session=null;modal=null;pendingCheck=null;editing=null;
   auth.tab="in";auth.err="";auth.msg="";
   if(wasAdmin&&route())history.replaceState(null,"",location.pathname);
