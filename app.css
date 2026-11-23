@@ -488,4 +488,3 @@ body{--bg:#f8f8f6;--ink:#20211f;--muted:#565c55;--line:#c8cbc5;--hero:#dfebfd;--
 #profile-form{display:grid;gap:16px}
 #profile-form>.btn{justify-self:start}
 
-.toast-undo{margin-inline-start:8px;min-height:44px;border:1px solid currentColor;border-radius:4px;padding:0 10px;background:transparent;color:inherit;font:inherit;font-weight:600}
