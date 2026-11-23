@@ -831,7 +831,7 @@ function topBar(){
  var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
  if(route()&&!isAdmin){
   var technicianName=myName();
-  auth=session?'<div class="technician-account">'+(technicianName?'<span class="technician-name">'+esc(technicianName)+'</span>':'<button class="btn ghost sm" data-act="tech-login">Указать имя</button>')+'<button class="btn ghost sm" data-act="logout">Выйти</button></div>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
+  auth=session?'<div class="technician-account">'+(technicianName?'<button class="btn ghost sm technician-name" data-act="tech-profile" aria-label="Личный кабинет техника: '+esc(technicianName)+'" title="Личный кабинет">'+esc(technicianName)+'</button>':'<button class="btn ghost sm" data-act="tech-login">Указать имя</button>')+'<button class="btn ghost sm" data-act="logout">Выйти</button></div>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
  }
  return '<header class="top"><div class="top-in gut">'+
   '<div class="brand"><h1>ТЗ на мероприятия | Серп и Молот</h1>'+mode+'</div>'+
@@ -1183,7 +1183,10 @@ function modalView(){
  if(modal.t==="trash")return isAdmin?wrap('<h2>Корзина</h2><p class="hint">ТЗ можно вернуть на доску вместе с содержимым и вложениями.</p>'+state.events.filter(function(e){return !!e.deletedAt}).sort(function(a,b){return b.deletedAt.localeCompare(a.deletedAt)}).map(function(e){return '<div class="req"><div class="req-i"><b>'+esc(e.title||"Без названия")+'</b><span class="hint">'+esc(fmtDate(e.date))+' · удалено '+esc(new Date(e.deletedAt).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="restore" data-id="'+esc(e.id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Корзина"):"";
  if(modal.t==="booking")return isAdmin?wrap('<h2>Зал уже указан в другом мероприятии</h2><p>На '+esc(fmtDate(modal.event.date))+' выбранные залы есть в следующих ТЗ:</p><ul>'+modal.matches.map(function(e){return '<li><b>'+esc(e.title||"Без названия")+'</b> — '+esc((e.halls||[]).filter(function(h){return modal.event.halls.indexOf(h)>=0}).map(function(h){return (hallById(h)||{name:h}).name}).join(", "))+'</li>'}).join("")+'</ul><p class="hint">Проверьте дату или выбор залов. Ваши правки сохранены в редакторе.</p><button class="btn primary" data-act="close">Вернуться</button>',"Проверка занятости залов"):"";
  if(modal.t==="tech-auth")return wrap(technicianForm(modal),"Вход техника");
- if(modal.t==="me")return wrap('<h2>Как вас зовут?</h2><p class="hint">Имя будет видно рядом с вашими отметками «сделано», чтобы все понимали, кто что выполнил.</p><form id="me-form" class="halls-row"><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(storedMe())+'"><div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div></form>',"Ваше имя");
+ if(modal.t==="me"){
+  var title=modal.profile?"Личный кабинет":"Как вас зовут?";
+  return wrap('<h2>'+title+'</h2><form id="me-form" class="halls-row"><label class="fld full"><span>Имя и фамилия</span><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(modal.name??myName())+'"></label><p class="hint">Это имя будет видно рядом с новыми отметками.</p>'+(modal.error?'<p class="auth-err" role="alert">'+esc(modal.error)+'</p>':'')+'<div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Закрыть</button><button type="submit" class="btn primary"'+(modal.busy?' disabled':'')+'>Сохранить</button></div></form>',title);
+ }
  if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(DEPTS.map(function(c){return {d:c.id,n:c.name}}));
   return wrap('<h2>Ссылки для техников</h2><p class="hint">Ссылка отдела сразу открывает только его блоки. Техник может переключить отдел сам.</p><div class="linkopts">'+opts.map(function(o){var u=linkFor(modal.id,o.d),iid="lk-"+(o.d||"all");
    return '<div class="linkopt"><span class="lo-n">'+esc(o.n)+'</span><input id="'+iid+'" readonly value="'+esc(u)+'" aria-label="Ссылка: '+esc(o.n)+'"><button class="btn sm" data-act="copy-one" data-url="'+esc(u)+'" data-inp="'+iid+'">Копировать</button></div>'}).join("")+'</div><div class="bar"><span class="sp"></span><button class="btn primary" data-act="close">Готово</button></div>',"Ссылки")}
@@ -1401,6 +1404,7 @@ app.addEventListener("click",function(e){
   case "retry-start":startSession();break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
+  case "tech-profile":if(route()&&session&&!isAdmin){modal={t:"me",profile:true};render();document.getElementById("me-in")?.focus()}break;
   case "tech-login":if(route()&&!isAdmin)openTechnician();break;
   case "tech-tab":if(modal?.t==="tech-auth"&&!modal.busy){modal.mode=d.mode;modal.error="";modal.message="";render()}break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
@@ -1489,13 +1493,23 @@ app.addEventListener("submit",function(e){
  if(e.target.id==="tech-auth-form"){submitTechnician();return}
  if(e.target.id==="me-form"){
   var nm=(document.getElementById("me-in").value||"").trim().replace(/\s+/g," ").slice(0,60);
-  if(!nm||!session)return;
-  var active=modal;
+  if(!session||modal?.t!=="me"||modal.busy)return;
+  var active=modal,userId=session.user.id;
+  active.name=nm;active.error=nm?"":"Укажите имя и фамилию.";
+  if(!nm){render();return}
+  active.busy=true;render();
   sb.auth.updateUser({data:{technician_name:nm}}).then(function(result){
+   if(result.error)throw result.error;
+   if(session?.user.id!==userId)return;
+   session=Object.assign({},session,{user:result.data.user});
+   if(modal===active){
+    finishTechnicianLogin(session);
+    if(active.profile){toast("Имя сохранено");document.querySelector('[data-act="tech-profile"]')?.focus()}
+   }else render();
+  }).catch(function(error){
    if(modal!==active)return;
-   if(result.error){toast(authErr(result.error));return}
-   finishTechnicianLogin(Object.assign({},session,{user:result.data.user}));
-  }).catch(function(error){toast(authErr(error))});
+   active.busy=false;active.error=authErr(error);render();
+  });
   return;
  }
  if(e.target.id==="auth-form"){
