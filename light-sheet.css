@@ -216,3 +216,22 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
  .top .mobile-sheet-status{display:none}
  .event-sheet .head > .pill{display:inline-flex}
 }
+
+.admin-board-short-title,.admin-board-profile-title,.admin-board-settings-icon{display:none}
+@media(max-width:560px){
+ .admin-board-header .top-in{display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,max-content);gap:6px;padding-block:8px}
+ .admin-board-header .top-in>.brand{display:block;min-width:0;margin:0;padding:0;border:0}
+ .admin-board-header .brand h1{font-size:14px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+ .admin-board-header .brand .mode{display:block;margin-top:2px;padding:0;border:0;background:none;color:var(--muted);font-size:11px;line-height:1.2}
+ .admin-board-header .admin-board-title,.admin-board-header .admin-board-settings-label{display:none}
+ .admin-board-header .admin-board-short-title,.admin-board-header .admin-board-profile-title,.admin-board-header .admin-board-settings-icon{display:block}
+ .admin-board-header .top-in>.btn,.admin-board-header .top-in>.search{box-sizing:border-box;min-height:44px}
+ .admin-board-header .top-in>.search{order:0;width:100%;min-width:0;margin:0;font-size:16px}
+ .admin-board-header .theme-btn,.admin-board-header [data-act="settings"]{position:relative;justify-content:center;width:44px;padding:0;border:1px solid var(--line);background:var(--surface)}
+ .admin-board-header .admin-board-settings-icon{font-size:18px;line-height:1}
+ .admin-board-header [data-act="settings"] .req-n{position:absolute;top:1px;right:1px;margin:0;padding:0 3px;min-width:13px;text-align:center;font-size:10px}
+ .admin-board-header .admin-board-profile{display:block;min-width:0;max-width:min(38vw,150px);padding:0 8px;border:1px solid var(--line);background:var(--surface);text-align:left;line-height:1.15}
+ .admin-board-header .admin-board-profile-title{font-weight:600}
+ .admin-board-header .admin-board-profile-name{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted);font-size:11px}
+ .admin-board-header [data-act="new"]{justify-content:center;padding-inline:8px;white-space:nowrap}
+}
