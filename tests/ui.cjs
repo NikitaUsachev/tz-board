@@ -79,6 +79,7 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  const techSession={user:{id:'tech',email:'tech@example.com',user_metadata:{technician_name:'Техник'}}};
  const signOutOptions={getSession:async()=>({data:{session:techSession}}),role:false};
  const signedInTech=await boot(false,false,false,[],signOutOptions);
+ assert.match(signedInTech.app.innerHTML,/class="technician-name">Техник<\/span>/);
  assert.match(signedInTech.app.innerHTML,/data-act="logout"/);
  signedInTech.click('logout');await tick();await tick();
  assert.equal(signedInTech.c.location.hash,'#ev-E');
