@@ -205,3 +205,14 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
  .technician-header .sheet-navigation [data-act="sheet-top"]{min-width:44px}
  .technician-header .sheet-navigation [data-act="sheet-top"] span{display:none}
 }
+
+.top .mobile-sheet-status{display:none}
+@media (max-width:560px), (max-width:900px) and (hover:none){
+ .top .mobile-sheet-status{display:inline-flex;width:max-content;max-width:100%;box-sizing:border-box;margin-top:3px;padding:2px 6px;font-size:11px;line-height:1.2}
+ .technician-header .brand:has(.mobile-sheet-status) .technician-brand-sub{display:none}
+ .event-sheet .head > .pill{display:none}
+}
+@media print{
+ .top .mobile-sheet-status{display:none}
+ .event-sheet .head > .pill{display:inline-flex}
+}
