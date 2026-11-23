@@ -575,11 +575,7 @@ function setCheck(evid,item,done){
   if(route()!==evid)return;
   if(r.error){if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid,item);toast("Не удалось сохранить отметку: "+r.error.message);return}
   if(checks[item])delete checks[item].pending;if(!editing&&!modal)paintChecks(evid,item);loadChecks(evid);
-  if(done&&!prev){
-   toast("Отметка сохранена",function(){
-    if(route()===evid&&myName()===name&&checks[item]?.by===name&&!checkPending[key])setCheck(evid,item,false);
-   });
-  }else if(!done)toast("Отметка снята");
+  if(!done)toast("Отметка снята");
  },function(){delete checkPending[key];if(route()!==evid)return;if(prev)checks[item]=prev;else delete checks[item];paintChecks(evid,item);toast("Не удалось сохранить отметку: ошибка сети")});
 }
 setInterval(function(){var id=route();if(authReady&&id&&!editing&&!document.hidden)loadChecks(id)},15000);
@@ -795,20 +791,7 @@ async function setDeleted(id,deleted){
 
 /* ---------- UI bits ---------- */
 var toastT;
-function toast(msg,undo){
- var t=document.getElementById("toast");
- if(!t){t=document.createElement("div");t.id="toast";t.className="toast";t.setAttribute("role","status");document.body.appendChild(t)}
- t.textContent=msg;
- if(undo){
-  var button=document.createElement("button");
-  button.type="button";button.className="toast-undo";button.textContent="Отменить";
-  button.onclick=function(){t.hidden=true;clearTimeout(toastT);undo()};
-  t.appendChild(button);
- }
- t.hidden=false;
- clearTimeout(toastT);
- toastT=setTimeout(function(){t.hidden=true},undo?8000:3200);
-}
+function toast(msg){var t=document.getElementById("toast");if(!t){t=document.createElement("div");t.id="toast";t.className="toast";t.setAttribute("role","status");document.body.appendChild(t)}t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},3200)}
 function showSaving(on){var s=document.getElementById("saving");if(on){if(!s){s=document.createElement("div");s.id="saving";s.className="saving";s.innerHTML="<div>Сохраняем…</div>";document.body.appendChild(s)}s.hidden=false}else if(s)s.hidden=true}
 function copyText(text){
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){toast("Ссылка скопирована")},function(){modal={t:"copy",text:text};render()})}
