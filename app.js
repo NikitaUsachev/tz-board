@@ -831,7 +831,8 @@ function topBar(){
  var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
  if(route()&&!isAdmin){
   var technicianName=myName();
-  auth=session?'<div class="technician-account">'+(technicianName?'<button class="btn ghost sm technician-name" data-act="tech-profile" aria-label="Личный кабинет техника: '+esc(technicianName)+'" title="Личный кабинет">'+esc(technicianName)+'</button>':'<button class="btn ghost sm" data-act="tech-login">Указать имя</button>')+'<button class="btn ghost sm" data-act="logout">Выйти</button></div>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
+  auth=session?'<div class="technician-account">'+(technicianName?'<span class="technician-name">'+esc(technicianName)+'</span>':'')+
+   '<button class="btn sm technician-profile" data-act="tech-profile">Личный кабинет</button><button class="btn ghost sm" data-act="logout">Выйти</button></div>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
  }
  return '<header class="top"><div class="top-in gut">'+
   '<div class="brand"><h1>ТЗ на мероприятия | Серп и Молот</h1>'+mode+'</div>'+
