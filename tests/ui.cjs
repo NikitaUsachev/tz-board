@@ -58,12 +58,26 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  profile.click("account");assert.match(profile.app.innerHTML,/value="Усачёв"/);
  const adminSheet=await boot(true);adminSheet.c.location.hash='ev-E';adminSheet.hash();assert.match(adminSheet.app.innerHTML,/Known event/);assert.match(adminSheet.app.innerHTML,/sheet gut event-sheet/);assert.match(adminSheet.app.innerHTML,/Редактировать/);for(const action of ['drafts','trash','releases'])assert.ok(adminSheet.app.innerHTML.includes('data-act="'+action+'"'));
  const t=await boot(false);assert.ok(!t.app.innerHTML.includes('Несохранённые изменения'));assert.ok(!t.app.innerHTML.includes('Корзина'));assert.ok(!t.app.innerHTML.includes('Зарегистрироваться'));assert.match(t.app.innerHTML,/Known event/);assert.match(t.app.innerHTML,/sheet gut event-sheet/);
- for(const f of t.listeners.change)f({target:{dataset:{done:'E|item'},checked:true}});assert.match(t.app.innerHTML,/Как вас зовут/);
+ for(const f of t.listeners.change)f({target:{dataset:{done:'E|item'},checked:true}});assert.match(t.app.innerHTML,/Войти как техник/);
+ assert.match(t.app.innerHTML,/Создать аккаунт техника/);
+ assert.doesNotMatch(t.app.innerHTML,/Заявка отправлена|id="auth-form"/);
+ t.click('tech-tab',{mode:'up'});
+ assert.match(t.app.innerHTML,/id="tech-name"/);
+ t.nodes['tech-email']={value:'tech@example.com'};
+ t.nodes['tech-name']={value:'Тестовый Техник'};
+ t.nodes['tech-password']={value:'example-password'};
+ t.c.document.querySelector=selector=>selector==='#tech-auth-form button[type="submit"]'?{}:null;
+ for(const f of t.listeners.submit)f({target:{id:'tech-auth-form'},preventDefault(){}});
+ await tick();
+ const signup=t.authCalls.find(call=>call.op==='up');
+ assert.equal(signup.p.options.data.technician_name,'Тестовый Техник');
+ assert.equal(signup.p.options.emailRedirectTo,'https://example.test/?tech_return=ev-E');
+ assert.match(t.app.innerHTML,/Проверьте почту/);
  assert.doesNotMatch(t.app.innerHTML,/Получать изменения в Telegram/);
  const tg=await boot(false,false,true);assert.match(tg.app.innerHTML,/example_tz_bot\?start=E/);assert.doesNotMatch(tg.app.innerHTML,/Зал готов/);assert.match(tg.app.innerHTML,/Осталось отметить: Звук — 1/);
  const completed=await boot(false,false,true,[{item_id:'item',by_name:'Имя'},{item_id:'arrival:item',by_name:'Имя'}]);assert.match(completed.app.innerHTML,/Зал готов/);
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);
- console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, first-check name prompt, hidden trash events');
+ console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, technician password registration, hidden trash events');
 })().catch(e=>{console.error(e);process.exitCode=1});
 
 
