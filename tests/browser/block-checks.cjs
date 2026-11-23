@@ -6,11 +6,12 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  await page.route('https://tz.test/**',r=>r.fulfill({contentType:'text/html',body:'<html><head></head><body><div id="app"></div></body></html>'}));
  await page.goto('https://tz.test/#ev-E');
  await page.evaluate(()=>{
+ let authChanged;
  const checks=new Map();window.calls=[];window.failNext=false;
  const ev={id:'E',title:'Проверка этапов монтажа',date:'2026-11-17',status:'prep',halls:['h'],hallNames:{h:'Большой зал'},blocks:{h:{}}};
  for(const c of ['sound','light','video','stage'])ev.blocks.h[c]={items:[{id:c+'-one',name:c==='sound'?'Радиомикрофон':'Оборудование',qty:'4'}]};
  window.TZ_CONFIG={url:'test',key:'test'};
- window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:'technician',email:'tech@example.com',user_metadata:{technician_name:'Иванов Иван'}}}}}),onAuthStateChange(){}},rpc:async(name,p)=>{
+ window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{user:{id:'technician',email:'tech@example.com',user_metadata:{technician_name:'Иванов Иван'}}}}}),onAuthStateChange(fn){authChanged=fn},async signOut(){authChanged('SIGNED_OUT',null);return {error:null}}},rpc:async(name,p)=>{
  window.calls.push({name,p});
  if(name==='is_admin')return {data:false};
  if(name==='get_event_v2'||name==='get_event')return {data:[{id:'E',data:ev,version:1}]};
@@ -40,5 +41,12 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  assert.ok(boxes.every(b=>b.h>=44));if(width===375)assert.ok(boxes[1].y>boxes[0].y);
  if(width===375)await page.screenshot({path:'/tmp/block-checks-mobile.png',fullPage:true});
  }
- assert.deepEqual(errors,[]);console.log('PASS browser: independent phases, attribution, undo, server error rollback, responsive 375/768/1440, no overflow or JS errors');await browser.close();
+ await page.getByRole('button',{name:'Выйти',exact:true}).click();
+ await page.locator('#tech-auth-form').waitFor({state:'visible'});
+ assert.equal(new URL(page.url()).hash,'#ev-E');
+ assert.equal(await page.locator('.event-sheet').count(),1);
+ assert.equal(await page.getByRole('button',{name:'Выйти',exact:true}).count(),0);
+ await page.locator('#tech-auth-form').getByRole('button',{name:'Закрыть',exact:true}).click();
+ await page.getByRole('button',{name:'Войти как техник',exact:true}).waitFor();
+ assert.deepEqual(errors,[]);console.log('PASS browser: independent phases, attribution, undo, server error rollback, responsive 375/768/1440, technician logout, no overflow or JS errors');await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
