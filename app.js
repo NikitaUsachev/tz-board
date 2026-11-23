@@ -837,8 +837,10 @@ function topBar(){
    '<span class="technician-profile-icon" aria-hidden="true"></span><span class="technician-profile-label"><strong>Профиль</strong><span class="technician-name">'+esc(technicianName||"Указать имя")+'</span></span></button>':
    '<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
  }
+ var sheet=route()&&!editing?evById(route()):null;
+ var status=sheet&&!sheet.deletedAt?'<span class="pill st-'+esc(sheet.status||"draft")+' mobile-sheet-status">'+esc(stName(sheet.status||"draft"))+'</span>':'';
  return '<header class="top'+(technician?' technician-header':'')+'"><div class="top-in gut">'+
-  '<div class="brand">'+(technician?'<h1>ТЗ мероприятий</h1><span class="technician-brand-sub">Серп и Молот</span>':'<h1>ТЗ на мероприятия | Серп и Молот</h1>')+mode+'</div>'+
+  '<div class="brand">'+(technician?'<h1>ТЗ мероприятий</h1><span class="technician-brand-sub">Серп и Молот</span>':'<h1>ТЗ на мероприятия | Серп и Молот</h1>')+mode+status+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
   (isAdmin?'<button class="btn" data-act="settings">Настройки'+(pendingCount()?'<span class="req-n" aria-label="Новых заявок: '+pendingCount()+'">'+pendingCount()+'</span>':'')+'</button>':'')+
   (isAdmin&&onBoard?'<button class="btn primary" data-act="new" data-st="draft">+ Новое ТЗ</button>':'')+
