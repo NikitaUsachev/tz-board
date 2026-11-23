@@ -486,9 +486,9 @@ function readyButton(ev,h){
  return confirmed||'<button class="btn primary" data-act="tg-ready" data-h="'+esc(h.id)+'">Зал готов</button>';
 }
 function sendHallReady(button,hall){
- var id=route(),name=storedMe();
+ var id=route(),name=myName();
  if(isAdmin||!window.TZ_CONFIG.telegram||!id||!hallProgress(evById(id),hall).done)return;
- if(!name||!Object.values(checks).some(function(check){return check.by===name})){toast("Сначала отметьте выполненный пункт в этом ТЗ");return}
+ if(!name){openTechnician();return}
  button.disabled=true;
  sb.rpc("tg_hall_ready",{p_event:id,p_hall:hall,p_name:name}).then(function(r){
   if(route()!==id)return;
@@ -560,7 +560,7 @@ var meMem="";
 function getCookie(n){var m=document.cookie.match(new RegExp("(?:^|; )"+n+"=([^;]*)"));try{return m?decodeURIComponent(m[1]):""}catch(e){return ""}}
 function saveMe(nm){meMem=nm;ls.set("tz-me",nm);try{sessionStorage.setItem("tz-me",nm)}catch(e){}try{document.cookie="tz-me="+encodeURIComponent(nm)+"; path=/; max-age=31536000; SameSite=Lax"}catch(e){}}
 function storedMe(){var v=meMem||ls.get("tz-me");if(!v){try{v=sessionStorage.getItem("tz-me")}catch(e){}}if(!v)v=getCookie("tz-me");if(v&&!meMem)meMem=v;return v||""}
-function myName(){return isAdmin?(storedMe()||myEmail().split("@")[0]):storedMe()}
+function myName(){return session?(String(session.user.user_metadata?.technician_name||"").trim().slice(0,60)||(isAdmin?myEmail().split("@")[0].slice(0,60):"")):""}
 function shortName(n){var p=String(n||"").trim().split(/\s+/);var f=p[0]?p[0].charAt(0).toUpperCase()+p[0].slice(1):"";return p.length>1?f+" "+p[1].charAt(0).toUpperCase()+".":f}
 function fmtWhen(at){var d=new Date(at);if(isNaN(d))return "";var t=d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});var today=new Date();return d.toDateString()===today.toDateString()?t:d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" "+t}
 function setCheck(evid,item,done){
@@ -594,7 +594,7 @@ function checkAdmin(){
   if(!current())return;
   startupError="";authReady=true;loaded=false;
   if(isAdmin){subscribe();loadAdmins().catch(function(){});loadRequests().then(function(){if(!editing&&!modal)render()}).catch(function(){});return loadAll()}
-  if(session)sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()}).catch(function(){});
+  if(session&&!route())sb.rpc("my_request_status").then(function(r){reqStatus=(r&&r.data)||"";render()}).catch(function(){});
   unsubscribe();admins=[];state.events=[];state.halls=[];legacyHalls=[];settingsData={};settingsStamp=null;versions={};editing=null;if(modal&&modal.t==="settings")modal=null;
   if(route())return loadTech(route());
   loaded=true;render();
@@ -829,6 +829,7 @@ function topBar(){
  var mode=isAdmin?'<span class="mode admin">Администратор</span>':'';
  var onBoard=!route()&&isAdmin;
  var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
+ if(route()&&!isAdmin)auth=session?'<button class="btn ghost sm" data-act="logout">Выйти</button>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
  return '<header class="top"><div class="top-in gut">'+
   '<div class="brand"><h1>ТЗ на мероприятия | Серп и Молот</h1>'+mode+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
@@ -1097,7 +1098,7 @@ function hallsView(ev,isEdit,depts){
   var hch=cats.some(function(c){return markCount(ev,h.id+"|"+c.id)});
   return '<section class="hall'+(hc?" closed":"")+'" id="hall-'+h.id+'"><button class="hall-h hall-toggle" data-act="tog" data-k="'+h.id+'" aria-expanded="'+(!hc)+'"><span class="chev" aria-hidden="true">'+(hc?"▸":"▾")+'</span><h3>'+esc(h.name)+'</h3>'+(hallRole(ev,h.id)?'<span class="hall-role">'+esc(hallRole(ev,h.id))+'</span>':'')+(hch?'<span class="chg chg-changed">Есть изменения</span>':'')+'<span class="eyebrow">'+tot2+' поз.</span></button>'+
    (hc?'':hallFilesView(ev,h.id,false)+(isAdmin?'':'<div class="hall-progress">'+readyButton(ev,h)+'</div>')+'<div class="cats cats-'+cats.filter(function(c){return !isGen(c.id)}).length+'">'+cats.map(function(c){return catRead(ev,h.id,c,done,col)}).join("")+'</div>')+'</section>';
- }).join("")+(isEdit?'':'<p class="hint me-line">Отметки выполнения видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b> · <button class="linkbtn" data-act="me">изменить</button>':'При первой отметке спросим ваше имя.')+'</p>');
+ }).join("")+(isEdit?'':'<p class="hint me-line">Отметки выполнения видят все, у кого есть ссылка на ТЗ. '+(myName()?'Вы отмечаете как <b>'+esc(myName())+'</b>':session?'При первой отметке укажите имя.':'Чтобы ставить отметки, войдите как техник.')+'</p>');
 }
 function chiefRead(b,k){if(!hasChief(b))return "";var m=curMarks["chief|"+k];
  return '<div class="chief'+(m?" mk-changed":"")+'"><span class="eyebrow">Бригадир</span><b>'+esc((b.chief.name||"").trim()||"—")+'</b>'+(m?badge("chief|"+k):"")+phoneHtml(b.chief.phone)+'</div>'}
@@ -1178,6 +1179,7 @@ function modalView(){
  if(modal.t==="drafts")return isAdmin?wrap('<h2>Несохранённые изменения</h2><p class="hint">Здесь находятся правки, которые вы ещё не сохранили в ТЗ. Они доступны только вам в этом браузере. Очистка данных браузера удалит эти правки.</p>'+Object.keys(drafts()).map(function(id){var x=drafts()[id];return '<div class="req"><div class="req-i"><b>'+esc(x.event.title||"Без названия")+'</b><span class="hint">'+esc(new Date(x.at).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="recover-draft" data-id="'+esc(id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Несохранённые изменения"):"";
  if(modal.t==="trash")return isAdmin?wrap('<h2>Корзина</h2><p class="hint">ТЗ можно вернуть на доску вместе с содержимым и вложениями.</p>'+state.events.filter(function(e){return !!e.deletedAt}).sort(function(a,b){return b.deletedAt.localeCompare(a.deletedAt)}).map(function(e){return '<div class="req"><div class="req-i"><b>'+esc(e.title||"Без названия")+'</b><span class="hint">'+esc(fmtDate(e.date))+' · удалено '+esc(new Date(e.deletedAt).toLocaleString("ru-RU"))+'</span></div><button class="btn sm primary" data-act="restore" data-id="'+esc(e.id)+'">Восстановить</button></div>'}).join("")+'<button class="btn" data-act="close">Закрыть</button>',"Корзина"):"";
  if(modal.t==="booking")return isAdmin?wrap('<h2>Зал уже указан в другом мероприятии</h2><p>На '+esc(fmtDate(modal.event.date))+' выбранные залы есть в следующих ТЗ:</p><ul>'+modal.matches.map(function(e){return '<li><b>'+esc(e.title||"Без названия")+'</b> — '+esc((e.halls||[]).filter(function(h){return modal.event.halls.indexOf(h)>=0}).map(function(h){return (hallById(h)||{name:h}).name}).join(", "))+'</li>'}).join("")+'</ul><p class="hint">Проверьте дату или выбор залов. Ваши правки сохранены в редакторе.</p><button class="btn primary" data-act="close">Вернуться</button>',"Проверка занятости залов"):"";
+ if(modal.t==="tech-auth")return wrap(technicianForm(modal),"Вход техника");
  if(modal.t==="me")return wrap('<h2>Как вас зовут?</h2><p class="hint">Имя будет видно рядом с вашими отметками «сделано», чтобы все понимали, кто что выполнил.</p><form id="me-form" class="halls-row"><input id="me-in" class="full" required maxlength="60" autocomplete="name" placeholder="Имя Фамилия" value="'+esc(storedMe())+'"><div class="bar"><span class="sp"></span><button type="button" class="btn" data-act="me-cancel">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div></form>',"Ваше имя");
  if(modal.t==="links"){var opts=[{d:"",n:"Все отделы"}].concat(DEPTS.map(function(c){return {d:c.id,n:c.name}}));
   return wrap('<h2>Ссылки для техников</h2><p class="hint">Ссылка отдела сразу открывает только его блоки. Техник может переключить отдел сам.</p><div class="linkopts">'+opts.map(function(o){var u=linkFor(modal.id,o.d),iid="lk-"+(o.d||"all");
@@ -1208,9 +1210,63 @@ function modalView(){
 /* ---------- auth screen ---------- */
 var AUTH_ERR={"Invalid login credentials":"Неверная почта или пароль.","Email not confirmed":"Почта ещё не подтверждена. Откройте письмо от Supabase и нажмите ссылку подтверждения.","User already registered":"Этот адрес уже зарегистрирован. Войдите или восстановите пароль.","Password should be at least 6 characters.":"Пароль слишком короткий."};
 function authErr(e){var m=(e&&e.message)||"Ошибка сети";if(AUTH_ERR[m])return AUTH_ERR[m];if(/email rate limit/i.test(m))return "Лимит писем исчерпан: достигнуто ограничение отправки писем. Попробуйте позже; если ошибка повторится, администратору нужно проверить SMTP и лимиты Auth.";if(/rate|limit|seconds/i.test(m))return "Слишком много попыток. Подождите минуту и попробуйте снова.";return m}
+function openTechnician(){
+ modal=session?{t:"me"}:{t:"tech-auth",mode:"in",email:"",name:""};
+ render();
+ document.getElementById(session?"me-in":"tech-email")?.focus();
+}
+function technicianForm(form){
+ var up=form.mode==="up",reset=form.mode==="reset";
+ var title=up?"Создать аккаунт техника":reset?"Восстановить пароль":"Войти как техник";
+ return '<h2>'+title+'</h2><form id="tech-auth-form" class="auth-form">'+
+  (up?'<label class="fld">Имя и фамилия<input id="tech-name" required maxlength="60" autocomplete="name" value="'+esc(form.name)+'"></label>':'')+
+  '<label class="fld">Почта<input id="tech-email" type="email" required autocomplete="username" value="'+esc(form.email)+'"></label>'+
+  (reset?'':'<label class="fld">Пароль<input id="tech-password" type="password" required '+(up?'minlength="8" ':'')+'autocomplete="'+(up?'new-password':'current-password')+'"></label>')+
+  (form.error?'<p class="auth-err" role="alert">'+esc(form.error)+'</p>':'')+
+  (form.message?'<p class="auth-msg" role="status">'+esc(form.message)+'</p>':'')+
+  '<button class="btn primary" type="submit"'+(form.busy?' disabled':'')+'>'+title+'</button>'+
+  (form.mode==="in"?'<button type="button" class="linkish" data-act="tech-tab" data-mode="up">Создать аккаунт техника</button><button type="button" class="linkish" data-act="tech-tab" data-mode="reset">Забыли пароль?</button>':'<button type="button" class="linkish" data-act="tech-tab" data-mode="in">Вернуться ко входу</button>')+
+  '<button type="button" class="btn" data-act="close">Закрыть</button></form>';
+}
+function technicianRedirect(){
+ return homeLink()+"?tech_return="+encodeURIComponent(location.hash.slice(1));
+}
+async function submitTechnician(){
+ var form=modal;
+ if(!form||form.t!=="tech-auth"||form.busy||!route())return;
+ var email=document.getElementById("tech-email").value.trim(),password=document.getElementById("tech-password")?.value;
+ var name=(document.getElementById("tech-name")?.value||"").trim().replace(/\s+/g," ");
+ form.email=email;form.name=name;form.error="";form.message="";
+ if(form.mode==="up"&&!name){form.error="Укажите имя.";render();return}
+ form.busy=true;
+ document.querySelector('#tech-auth-form button[type="submit"]').disabled=true;
+ try{
+  var result=form.mode==="in"?await sb.auth.signInWithPassword({email:email,password:password}):
+   form.mode==="up"?await sb.auth.signUp({email:email,password:password,options:{data:{technician_name:name},emailRedirectTo:technicianRedirect()}}):
+   await sb.auth.resetPasswordForEmail(email,{redirectTo:technicianRedirect()});
+  if(modal!==form)return;
+  if(result.error)throw result.error;
+  if(form.mode==="in")finishTechnicianLogin(result.data.session);
+  else{
+   form.message=form.mode==="up"?"Проверьте почту и перейдите по ссылке для подтверждения адреса.":"Если адрес зарегистрирован, мы отправили ссылку для сброса пароля.";
+   form.mode="in";
+  }
+ }catch(error){if(modal===form)form.error=authErr(error)}
+ finally{form.busy=false;if(modal===form)render()}
+}
+function finishTechnicianLogin(activeSession){
+ if(!activeSession)return;
+ session=activeSession;
+ var pc=pendingCheck;
+ if(pc&&pc.ev===route()&&!myName()){modal={t:"me"};render();return}
+ pendingCheck=null;modal=null;render();
+ if(pc&&pc.ev===route())setCheck(pc.ev,pc.item,pc.done);
+}
 function authView(){
  var h='<div class="auth gut"><div class="auth-top">'+themeBtn()+'</div><div class="auth-card"><div class="auth-brand"><span class="eyebrow">Техническое обеспечение мероприятий</span><h1>ТЗ на мероприятия | Серп и Молот</h1></div>';
- if(session&&!isAdmin){
+ if(session&&!isAdmin&&session.user.user_metadata?.technician_name){
+  h+='<p>Вы вошли как техник.</p><p>Откройте ссылку на ТЗ, которую прислал администратор.</p><button class="btn" data-act="logout">Выйти</button>';
+ }else if(session&&!isAdmin){
   h+='<p>Вы вошли как <b>'+esc(myEmail())+'</b>.</p>'+(reqStatus==="rejected"?'<p class="req-state rej"><b>Заявка отклонена.</b> Если это ошибка, свяжитесь с администратором.</p>':'<p class="req-state"><b>Заявка отправлена.</b> Администратор увидит её в «Настройках» и подтвердит доступ. После этого нажмите «Проверить снова».</p>')+''+
    '<div class="bar"><button class="btn danger" data-act="logout">Выйти</button><span class="sp"></span><button class="btn primary" data-act="recheck">Проверить снова</button></div>';
  }else{
@@ -1227,7 +1283,7 @@ function authView(){
    (t==="reset"?'<button type="button" class="linkish" data-act="auth-tab" data-tab="in">← Вернуться ко входу</button>':'')+
    '</form>';
   if(CFG.google&&t!=="reset")h+='<div class="auth-or"><span>или</span></div><button class="btn auth-google" data-act="google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Продолжить с Google</button>';
-  h+='<p class="hint auth-note">Вход нужен только администраторам. Техники открывают ТЗ по ссылке, которую присылает администратор.</p>';
+  h+='<p class="hint auth-note">Вход для администраторов. Техники входят и регистрируются внутри ТЗ по ссылке.</p>';
  }
  return h+'</div></div>';
 }
@@ -1322,6 +1378,8 @@ app.addEventListener("click",function(e){
   case "retry-start":startSession();break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
+  case "tech-login":if(route()&&!isAdmin)openTechnician();break;
+  case "tech-tab":if(modal?.t==="tech-auth"&&!modal.busy){modal.mode=d.mode;modal.error="";modal.message="";render()}break;
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
   case "releases":if(isAdmin){markReleaseRead();modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
   case "recheck":checkAdmin();break;
@@ -1405,7 +1463,18 @@ app.addEventListener("click",function(e){
 app.addEventListener("submit",function(e){
  e.preventDefault();
  if(e.target.id==="profile-form"){saveAccountProfile();return}
- if(e.target.id==="me-form"){var nm=(document.getElementById("me-in").value||"").trim().replace(/\s+/g," ").slice(0,60);if(!nm)return;saveMe(nm);modal=null;var pc=pendingCheck;pendingCheck=null;render();if(pc)setCheck(pc.ev,pc.item,pc.done);else toast("Имя сохранено");return}
+ if(e.target.id==="tech-auth-form"){submitTechnician();return}
+ if(e.target.id==="me-form"){
+  var nm=(document.getElementById("me-in").value||"").trim().replace(/\s+/g," ").slice(0,60);
+  if(!nm||!session)return;
+  var active=modal;
+  sb.auth.updateUser({data:{technician_name:nm}}).then(function(result){
+   if(modal!==active)return;
+   if(result.error){toast(authErr(result.error));return}
+   finishTechnicianLogin(Object.assign({},session,{user:result.data.user}));
+  }).catch(function(error){toast(authErr(error))});
+  return;
+ }
  if(e.target.id==="auth-form"){
   var em=(document.getElementById("auth-email").value||"").trim(),pw=document.getElementById("auth-pass"),pw2=document.getElementById("auth-pass2");
   auth.email=em;auth.err="";auth.msg="";
@@ -1468,7 +1537,7 @@ app.addEventListener("change",function(e){
  var t=e.target,d=t.dataset;
  if(t.id==="hall-navigation"&&t.value){var targetHall=t.value;t.value="";jumpToHall(targetHall);return}
  if(d.hallpick&&editing){var id=d.hallpick;if(t.checked){if(editing.halls.indexOf(id)<0){var order=state.halls.map(function(h){return h.id});editing.hallNames=editing.hallNames||{};var picked=state.halls.filter(function(h){return h.id===id})[0];if(picked&&!editing.hallNames[id])editing.hallNames[id]=picked.name;editing.halls.push(id);editing.halls.sort(function(a,b){return order.indexOf(a)-order.indexOf(b)})}}else editing.halls=editing.halls.filter(function(h){return h!==id});dirty=true;render()}
- if(d.done){var at=d.done.indexOf("|"),p=[d.done.slice(0,at),d.done.slice(at+1)];if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;modal={t:"me"};render();setTimeout(function(){var i=document.getElementById("me-in");if(i)i.focus()},30)}else setCheck(p[0],p[1],t.checked)}
+ if(d.done){var at=d.done.indexOf("|"),p=[d.done.slice(0,at),d.done.slice(at+1)];if(!myName()){pendingCheck={ev:p[0],item:p[1],done:t.checked};t.checked=!t.checked;openTechnician()}else setCheck(p[0],p[1],t.checked)}
  if(t.id==="f-status"&&editing){editing.status=t.value;dirty=true}
  if(d.upload&&editing&&t.files&&t.files.length){uploadFiles(d.upload,t.files);t.value=""}
 });
@@ -1513,16 +1582,25 @@ window.addEventListener("hashchange",function(){
 });
 
 /* ---------- boot ---------- */
-function cleanAuthHash(){if(/access_token=|error_description=|type=recovery/.test(location.hash))history.replaceState(null,"",location.pathname+location.search)}
+function cleanAuthHash(){
+ var params=new URLSearchParams(location.search),target=params.get("tech_return");
+ if(target&&/^ev-[a-z0-9_-]{1,80}(?:~(?:sound|light|video))?$/i.test(target)){
+  params.delete("tech_return");
+  history.replaceState(null,"",location.pathname+(params.size?"?"+params.toString():"")+"#"+target);
+ }else if(/access_token=|error_description=|type=recovery/.test(location.hash)){
+  history.replaceState(null,"",location.pathname+location.search);
+ }
+}
 var urlErr=(location.hash.match(/error_description=([^&]+)/)||[])[1];
-if(urlErr){auth.err=decodeURIComponent(urlErr.replace(/\+/g," "));if(/expired|invalid/i.test(auth.err))auth.err="Ссылка из письма устарела или уже использована. Запросите новую.";}
+if(urlErr){try{auth.err=decodeURIComponent(urlErr.replace(/\+/g," "))}catch(_){auth.err="Не удалось открыть ссылку из письма."}if(/expired|invalid/i.test(auth.err))auth.err="Ссылка из письма устарела или уже использована. Запросите новую.";if(new URLSearchParams(location.search).has("tech_return")){modal={t:"tech-auth",mode:"in",email:"",name:"",error:auth.err}}}
 render();
 window.TZ_APP_STARTED=true;
 startSession();
 sb.auth.onAuthStateChange(function(ev,s){
  var prev=session&&session.user&&session.user.id;session=s||null;
  if(ev==="PASSWORD_RECOVERY"){modal={t:"newpass"};}
- cleanAuthHash();
+ if(ev!=="TOKEN_REFRESHED")cleanAuthHash();
+ if(modal?.t==="tech-auth"&&modal.busy)return;
  if(ev==="SIGNED_IN"&&s&&s.user&&s.user.id!==prev){auth.msg="";auth.err="";setTimeout(checkAdmin,0)}
  if(ev==="SIGNED_OUT"){setTimeout(checkAdmin,0)}
  render();
