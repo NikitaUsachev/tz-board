@@ -76,6 +76,26 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  assert.doesNotMatch(t.app.innerHTML,/Получать изменения в Telegram/);
  const tg=await boot(false,false,true);assert.match(tg.app.innerHTML,/example_tz_bot\?start=E/);assert.doesNotMatch(tg.app.innerHTML,/Зал готов/);assert.match(tg.app.innerHTML,/Осталось отметить: Звук — 1/);
  const completed=await boot(false,false,true,[{item_id:'item',by_name:'Имя'},{item_id:'arrival:item',by_name:'Имя'}]);assert.match(completed.app.innerHTML,/Зал готов/);
+ const techSession={user:{id:'tech',email:'tech@example.com',user_metadata:{technician_name:'Техник'}}};
+ const signOutOptions={getSession:async()=>({data:{session:techSession}}),role:false};
+ const signedInTech=await boot(false,false,false,[],signOutOptions);
+ assert.match(signedInTech.app.innerHTML,/data-act="logout"/);
+ signedInTech.click('logout');await tick();await tick();
+ assert.equal(signedInTech.c.location.hash,'#ev-E');
+ assert.match(signedInTech.app.innerHTML,/id="tech-auth-form"/);
+ assert.doesNotMatch(signedInTech.app.innerHTML,/data-act="logout"|id="auth-form"/);
+ assert.equal(signedInTech.authCalls.find(call=>call.op==='out').p.scope,'local');
+
+ const failedLogout=await boot(false,false,false,[],{...signOutOptions,signOutError:{message:'Ошибка сети'}});
+ failedLogout.click('logout');await tick();
+ assert.match(failedLogout.app.innerHTML,/data-act="logout"/);
+ assert.match(failedLogout.nodes.toast.textContent,/Не удалось выйти/);
+
+ const adminLogout=await boot(true);
+ adminLogout.c.location.hash='ev-E';adminLogout.hash();adminLogout.click('logout');await tick();await tick();
+ assert.equal(adminLogout.c.location.hash,'');
+ assert.match(adminLogout.app.innerHTML,/id="auth-form"/);
+ assert.doesNotMatch(adminLogout.app.innerHTML,/id="tech-auth-form"/);
  const gone=await boot(false,true);assert.ok(!gone.app.innerHTML.includes('Known event'));assert.match(gone.app.innerHTML,/ТЗ не найдено/);
  console.log('PASS: full script boot, admin board, navigation guard, draft recovery and save, technician-only page, technician password registration, hidden trash events');
 })().catch(e=>{console.error(e);process.exitCode=1});
