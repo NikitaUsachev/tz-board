@@ -235,3 +235,21 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
  .admin-board-header .admin-board-profile-name{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted);font-size:11px}
  .admin-board-header [data-act="new"]{justify-content:center;padding-inline:8px;white-space:nowrap}
 }
+
+.technician-home{display:grid;gap:12px;padding-block:16px}
+.technician-home>h2,.technician-date{margin:0;font-size:18px}
+.technician-home>.seg{justify-self:start}
+.technician-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.technician-board .col-h{margin-bottom:8px}
+.technician-home .card>.pill{align-self:flex-start}
+.technician-event-list{display:grid;gap:8px}
+.technician-event-list .card+.card{margin:0}
+.technician-week-bar,.technician-week{display:grid;align-items:center;gap:4px}
+.technician-week-bar{grid-template-columns:44px minmax(0,1fr) 44px auto;text-align:center}
+.technician-week{grid-template-columns:repeat(7,minmax(0,1fr))}
+.technician-week-bar>.btn,.technician-day{min-height:44px;min-width:0;padding-inline:4px;justify-content:center}
+.technician-day{display:grid;align-content:center;gap:2px;position:relative;padding-block:4px 8px}
+.technician-day>span{font-size:11px}
+.technician-day[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent)}
+.technician-day.busy::after{content:"";position:absolute;bottom:3px;left:50%;width:4px;height:4px;border-radius:50%;background:currentColor}
+@media(max-width:560px){.technician-board{grid-template-columns:minmax(0,1fr)}}
