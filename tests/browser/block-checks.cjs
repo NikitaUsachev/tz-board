@@ -41,6 +41,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  assert.ok(boxes.every(b=>b.h>=44));if(width===375)assert.ok(boxes[1].y>boxes[0].y);
  if(width===375)await page.screenshot({path:'/tmp/block-checks-mobile.png',fullPage:true});
  }
+ await page.getByRole('button',{name:'Профиль: Иванов Иван',exact:true}).click();
  await page.getByRole('button',{name:'Выйти',exact:true}).click();
  await page.locator('#tech-auth-form').waitFor({state:'visible'});
  assert.equal(new URL(page.url()).hash,'#ev-E');
