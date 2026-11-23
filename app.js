@@ -1002,6 +1002,28 @@ function factCell(label,key,val,type,isEdit,extra){
  if(isEdit)return '<label class="fact"><span class="eyebrow">'+label+'</span><input id="f-'+key+'" type="'+type+'" data-f="'+key+'" value="'+esc(val||"")+'">'+(key==="rehearsal"&&editing&&editing.mountDate?'<span class="fact-act seg-mini"><button type="button" class="linkbtn'+(editing.rehearsalDay!=="mount"?" on":"")+'" data-act="reh-day" data-v="">в день мероприятия</button><button type="button" class="linkbtn'+(editing.rehearsalDay==="mount"?" on":"")+'" data-act="reh-day" data-v="mount">в монтажный день</button></span>':'')+(key==="mountDate"?'<span class="fact-act"><button type="button" class="linkbtn" data-act="mount-eve">накануне</button>'+(val?' · <button type="button" class="linkbtn" data-act="mount-clear">очистить</button>':'')+'</span>':'')+'</label>';
  return '<div class="fact"><span class="eyebrow">'+label+'</span><span class="v'+(extra||"")+(val?"":" dim")+'">'+(val?esc(type==="date"?fmtDate(val,{day:"numeric",month:"long",year:"numeric"}):val):"—")+'</span>'+(type==="date"&&val?'<span class="eyebrow">'+esc(fmtDate(val,{weekday:"long"}))+'</span>':'')+'</div>';
 }
+function equipmentSummary(ev){
+ return CATS.map(function(category){
+  var rows=new Map();
+  (ev.halls||[]).forEach(function(hall){
+   (blk(ev,hall,category.id).items||[]).forEach(function(item){
+    var name=String(item.name||"").trim().replace(/\s+/g," ");
+    if(!name)return;
+    var key=name.toLocaleLowerCase("ru-RU");
+    if(!rows.has(key))rows.set(key,{name:name,total:0,known:false,incomplete:false});
+    var row=rows.get(key),qty=String(item.qty??"").trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:шт\.?)?$/i);
+    var number=qty?Number(qty[1].replace(",",".")):NaN;
+    if(Number.isFinite(number)&&Number.isFinite(row.total+number)){row.total+=number;row.known=true}
+    else row.incomplete=true;
+   });
+  });
+  if(!rows.size)return "";
+  return '<h3>'+category.name+'</h3><dl class="equipment-summary-list">'+Array.from(rows.values()).map(function(row){
+   return '<div><dt>'+esc(row.name)+'</dt><dd>'+(row.known?esc(row.total.toLocaleString("ru-RU",{maximumFractionDigits:12}))+' шт.':'—')+'</dd>'+
+    (row.incomplete?'<dd class="hint">Количество неполное</dd>':'')+'</div>';
+  }).join("")+'</dl>';
+ }).join("");
+}
 function headView(ev,isEdit){
  var halls=evHalls(ev);
  var h='<header class="head">';
@@ -1034,6 +1056,8 @@ function headView(ev,isEdit){
  if(isEdit)h+='<div class="docs">'+DOCS.map(function(d){return filesEdit(docs[d.id],d.name,"d|"+d.id,d.accept||DOC_ACCEPT,"+ Загрузить","")}).join("")+'</div><p class="hint">Сценарии: PDF, Word, Excel, PowerPoint, изображения · Схемы: PDF, изображения, Vectorworks, DWG, MVR · до 50 МБ на файл</p>';
  else{var dh=DOCS.map(function(d){return filesRead(docs[d.id],d.name)}).join("");if(dh)h+='<div class="docs">'+dh+'</div>'}
  if(!isEdit&&ev.updatedAt)h+='<p class="hint">Обновлено '+esc(new Date(ev.updatedAt).toLocaleString("ru-RU",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"}))+(isAdmin&&ev.updatedBy?" · "+esc(ev.updatedBy):"")+'</p>';
+ var inventory=equipmentSummary(ev);
+ if(isEdit||inventory)h+='<details class="ux-panel equipment-summary" data-event="'+esc(ev.id)+'"'+(inventory?'':' hidden')+'><summary>Сводка оборудования</summary><div id="equipment-summary-content">'+inventory+'</div></details>';
  return h+'</header>';
 }
 function pickerPop(ev){
@@ -1219,6 +1243,7 @@ function render(){
  var uxAnchor=Array.from(document.querySelectorAll('.row,.stage-unit,.cat-h,.hall-h')).find(function(n){var r=n.getBoundingClientRect();return r.top>=180&&r.top<window.innerHeight});
  var uxKey=uxAnchor&&(uxAnchor.querySelector('[data-done]')?.dataset.done||uxAnchor.dataset.k);
  var uxTop=uxAnchor&&uxAnchor.getBoundingClientRect().top;
+ var openInventory=document.querySelector('.equipment-summary[open]');
  var uxContacts=!!document.querySelector('.ux-contacts[open]');
  var active=document.activeElement, aid=active&&active.id, sel=null;
  try{if(aid&&active.selectionStart!=null)sel=[active.selectionStart,active.selectionEnd]}catch(_){}
@@ -1230,6 +1255,7 @@ function render(){
  app.classList.toggle("admin-layout",isAdmin&&!id);
  if(editing&&dirty)persistDraft();
  app.innerHTML=body+(isAdmin&&!editing?adminFooter():"")+(isAdmin?datalists():'')+modalView();
+ if(openInventory){var inventoryPanel=document.querySelector('.equipment-summary');if(inventoryPanel&&inventoryPanel.dataset.event===openInventory.dataset.event)inventoryPanel.open=true}
  if(uxContacts){var ct=document.querySelector('.ux-contacts');if(ct)ct.open=true}
  window.scrollTo(0,y);
  if(uxKey){var candidate=Array.from(document.querySelectorAll('[data-done],[data-k]')).find(function(n){return n.dataset.done===uxKey||n.dataset.k===uxKey});if(candidate){var anchor=candidate.closest('.row,.stage-unit,.cat-h,.hall-h');if(anchor)window.scrollBy(0,anchor.getBoundingClientRect().top-uxTop)}}
@@ -1429,6 +1455,10 @@ app.addEventListener("input",function(e){
   else if(d.f==="cnote"){editing.blocks[d.h][d.c].note=t.value}
   else editing[d.f]=t.value;
   if(!dirty||exitArmed){dirty=true;exitArmed=false;var m=document.querySelector(".editbar .msg");if(m)m.textContent="Есть несохранённые изменения"}
+ }
+ if(d.f==="item"&&(d.k==="name"||d.k==="qty")&&editing){
+  var inventoryContent=document.getElementById("equipment-summary-content");
+  if(inventoryContent){var summary=equipmentSummary(editing);inventoryContent.innerHTML=summary;inventoryContent.parentElement.hidden=!summary}
  }
  if(d.f&&editing)persistDraft();
  if(t.id==="q"){query=t.value;render()}
