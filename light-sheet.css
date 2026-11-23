@@ -185,12 +185,23 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 .equipment-summary-list dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;max-width:14ch}
 .equipment-summary-list dd.hint{grid-column:1/-1;margin:0;max-width:none;text-align:left}
 
-.technician-account{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
-.technician-name{font-weight:500;overflow-wrap:anywhere;min-width:0}
-.technician-account .btn{flex:none}
-.technician-account .technician-name{flex:0 1 auto;text-align:right}
-.technician-account .technician-profile{background:var(--accent-soft);border:1px solid var(--line);color:var(--ink);white-space:nowrap;min-height:36px}
+.technician-header .top-in>.brand{display:block;flex:1 1 0;margin:0}
+.technician-header .brand h1{font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.technician-brand-sub{display:block;color:var(--muted);font-size:12px;line-height:1.2}
+.technician-header .top-in>.btn{box-sizing:border-box;height:44px;min-height:44px;flex:none;border:1px solid var(--line);border-radius:6px}
+.technician-header .theme-btn{width:44px;padding:0;background:var(--surface)}
+.technician-header .theme-btn .lbl{display:none}
+.technician-header .technician-profile{display:flex;gap:6px;min-width:0;max-width:48%;padding:0 8px;background:var(--accent-soft);color:var(--ink);text-align:left}
+.technician-profile-icon{position:relative;flex:0 0 16px;width:16px;height:16px}
+.technician-profile-icon::before,.technician-profile-icon::after{content:"";position:absolute;left:50%;transform:translateX(-50%);border:1px solid currentColor}
+.technician-profile-icon::before{top:0;width:5px;height:5px;border-radius:50%}
+.technician-profile-icon::after{bottom:0;width:12px;height:5px;border-radius:7px 7px 2px 2px}
+.technician-profile-label{display:block;min-width:0;line-height:1.15}
+.technician-profile-label strong,.technician-profile-label .technician-name{display:block}
+.technician-name{margin-top:2px;color:var(--muted);font-size:11px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:560px){
- .technician-account{flex:1 1 auto;flex-wrap:wrap;justify-content:flex-end}
- .technician-account .btn{min-height:44px}
+ .technician-header .top-in{gap:6px;padding-block:8px}
+ .technician-header .top-in>.brand h1{font-size:14px;line-height:1.2}
+ .technician-header .sheet-navigation [data-act="sheet-top"]{min-width:44px}
+ .technician-header .sheet-navigation [data-act="sheet-top"] span{display:none}
 }
