@@ -87,8 +87,10 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  const signOutOptions={getSession:async()=>({data:{session:techSession}}),role:false};
  const signedInTech=await boot(false,false,false,[],signOutOptions);
  assert.match(signedInTech.app.innerHTML,/data-done="E\|item" aria-label/);
- assert.match(signedInTech.app.innerHTML,/data-act="tech-profile"[^>]*>Личный кабинет<\/button>/);
+ assert.match(signedInTech.app.innerHTML,/data-act="tech-profile"[^>]*aria-label="Профиль: Техник"/);
  assert.match(signedInTech.app.innerHTML,/class="technician-name">Техник<\/span>/);
+ assert.doesNotMatch(signedInTech.app.innerHTML,/data-act="logout"/);
+ signedInTech.click('tech-profile');
  assert.match(signedInTech.app.innerHTML,/data-act="logout"/);
  signedInTech.click('logout');await tick();await tick();
  assert.equal(signedInTech.c.location.hash,'#ev-E');
@@ -98,7 +100,7 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
 
  for(const signOutError of [{name:'AuthSessionMissingError',message:'Auth session missing!'},{message:'Auth session missing!'}]){
   const staleLogout=await boot(false,false,false,[],{...signOutOptions,signOutError});
-  staleLogout.click('logout');await tick();await tick();
+  staleLogout.click('tech-profile');staleLogout.click('logout');await tick();await tick();
   assert.equal(staleLogout.c.location.hash,'#ev-E');
   assert.match(staleLogout.app.innerHTML,/id="tech-auth-form"/);
   assert.doesNotMatch(staleLogout.app.innerHTML,/data-act="logout"|class="technician-name"/);
@@ -113,7 +115,7 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  assert.match(profileTech.app.innerHTML,/class="technician-name">Анна Иванова<\/span>/);
  assert.doesNotMatch(profileTech.app.innerHTML,/id="me-form"/);
  const failedLogout=await boot(false,false,false,[],{...signOutOptions,signOutError:{message:'Ошибка сети'}});
- failedLogout.click('logout');await tick();
+ failedLogout.click('tech-profile');failedLogout.click('logout');await tick();
  assert.match(failedLogout.app.innerHTML,/data-act="logout"/);
  assert.match(failedLogout.nodes.toast.textContent,/Не удалось выйти/);
 
