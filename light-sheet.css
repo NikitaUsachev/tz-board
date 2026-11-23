@@ -184,3 +184,8 @@ body{--bg:#f6f6f2;--surface:#fff;--surface-2:#f0f1ed;--ink:#191c1d;--muted:#515b
 .equipment-summary-list dt{overflow-wrap:anywhere}
 .equipment-summary-list dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;max-width:14ch}
 .equipment-summary-list dd.hint{grid-column:1/-1;margin:0;max-width:none;text-align:left}
+
+.technician-account{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
+.technician-name{font-weight:500;overflow-wrap:anywhere;min-width:0}
+.technician-account .btn{flex:none}
+@media(max-width:560px){.technician-account{flex:1 1 0;justify-content:flex-end}}
