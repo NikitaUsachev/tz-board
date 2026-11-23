@@ -829,7 +829,10 @@ function topBar(){
  var mode=isAdmin?'<span class="mode admin">Администратор</span>':'';
  var onBoard=!route()&&isAdmin;
  var auth=isAdmin?'<button class="btn ghost sm" data-act="account" title="'+esc(myEmail())+'">'+esc(accountLabel())+'</button>':'';
- if(route()&&!isAdmin)auth=session?'<button class="btn ghost sm" data-act="logout">Выйти</button>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
+ if(route()&&!isAdmin){
+  var technicianName=myName();
+  auth=session?'<div class="technician-account">'+(technicianName?'<span class="technician-name">'+esc(technicianName)+'</span>':'<button class="btn ghost sm" data-act="tech-login">Указать имя</button>')+'<button class="btn ghost sm" data-act="logout">Выйти</button></div>':'<button class="btn ghost sm" data-act="tech-login">Войти как техник</button>';
+ }
  return '<header class="top"><div class="top-in gut">'+
   '<div class="brand"><h1>ТЗ на мероприятия | Серп и Молот</h1>'+mode+'</div>'+
   (onBoard?'<input id="q" class="search" type="search" placeholder="Поиск по названию или залу" value="'+esc(query)+'" aria-label="Поиск">':'')+
@@ -1237,7 +1240,7 @@ function technicianForm(form){
  var up=form.mode==="up",reset=form.mode==="reset";
  var title=up?"Создать аккаунт техника":reset?"Восстановить пароль":"Войти как техник";
  return '<h2>'+title+'</h2><form id="tech-auth-form" class="auth-form">'+
-  (up?'<label class="fld">Имя и фамилия<input id="tech-name" required maxlength="60" autocomplete="name" value="'+esc(form.name)+'"></label>':'')+
+  (up?'<label class="fld">Имя и фамилия<input id="tech-name" required maxlength="60" autocomplete="name" placeholder="Например, Алексей Иванов" value="'+esc(form.name)+'"></label>':'')+
   '<label class="fld">Почта<input id="tech-email" type="email" required autocomplete="username" value="'+esc(form.email)+'"></label>'+
   (reset?'':'<label class="fld">Пароль<input id="tech-password" type="password" required '+(up?'minlength="8" ':'')+'autocomplete="'+(up?'new-password':'current-password')+'"></label>')+
   (form.error?'<p class="auth-err" role="alert">'+esc(form.error)+'</p>':'')+
