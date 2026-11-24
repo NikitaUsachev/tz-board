@@ -2,9 +2,12 @@
   "name": "tz-board",
   "private": true,
   "version": "28.16.0",
-  "engines": {"node": ">=24"},
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "test": "node --test --test-timeout=30000 tests/*.cjs",
-    "test:coverage": "node --test --test-timeout=30000 --experimental-test-coverage --test-coverage-include=app.js --test-coverage-include=supabase/functions/tz-telegram/index.ts tests/*.cjs"
+    "test:coverage": "node --test --test-timeout=30000 --experimental-test-coverage --test-coverage-include=app.js --test-coverage-include=supabase/functions/tz-telegram/index.ts tests/*.cjs",
+    "test:live": "node tests/live/contract.cjs"
   }
 }
