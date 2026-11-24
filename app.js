@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.23","date":"24 ноября 2026","title":"ТЗ в тестовой теме Telegram","groups":[{"title":"Для администратора","items":["В карточке мероприятия появилась кнопка отправки текстового ТЗ в тестовую тему Telegram.","Перед отправкой видны тексты и список изменённых разделов. Повторная публикация обновляет только изменившиеся сообщения.","Сохранение ТЗ само по себе не запускает публикацию в группу."]}]},
 {"version":"28.22","date":"20 ноября 2026","title":"Восстановление загрузки","groups":[{"title":"Надёжность","items":["При задержке загрузки появляется понятное сообщение и кнопка повторной попытки.","Загрузка приложения больше не зависит от внешнего сервера библиотеки.","Ошибки проверки входа больше не оставляют бесконечный экран загрузки."]}]},
 {"version":"28.21","date":"17 ноября 2026","title":"Ширина ТЗ на телефоне","groups":[{"title":"Исправления","items":["Длинные названия и назначения залов переносятся внутри страницы и не растягивают мобильный лист ТЗ."]}]},
 {"version":"28.20","date":"17 ноября 2026","title":"Файлы на телефоне","groups":[{"title":"Исправления","items":["Длинные названия файлов переносятся внутри карточки. Метка Новое, размер и кнопки Открыть / Скачать больше не выходят за её границы."]}]},
@@ -1047,11 +1048,51 @@ function sheetView(id){
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);if(curDiff)storeMarks(ev,curDiff);curMarks=activeMarks(ev);
  return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+(!session?'<p class="hint">Режим просмотра. Войдите как техник, чтобы ставить отметки.</p>':'')+'<div id="telegram-link">'+telegramLink(ev)+'</div>'+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
+/* Explicit publication: independent from subscriber notifications. */
+async function publicationRequest(action,id,version){
+ var authResult=await readDeadline(sb.auth.getSession(),"Проверка входа");
+ var token=authResult.data&&authResult.data.session&&authResult.data.session.access_token;
+ if(!token)throw new Error("Войдите заново как администратор");
+ var response=await fetch(CFG.url+"/functions/v1/tz-publish",{method:"POST",headers:{Authorization:"Bearer "+token,apikey:CFG.key,"Content-Type":"application/json"},body:JSON.stringify({action:action,event:id,version:version}),signal:AbortSignal.timeout(45000)});
+ var result=await response.json();if(!response.ok)throw new Error(result.error||"Не удалось связаться с сервером публикации");return result;
+}
+async function publicationPreview(id){
+ if(!isAdmin||editing)return;
+ var current={t:"publication",id:id,loading:true};modal=current;render();
+ try{current.preview=await publicationRequest("preview",id)}catch(e){current.error=e.message||"Ошибка загрузки предпросмотра"}
+ current.loading=false;if(modal===current)render();
+}
+async function publicationSend(){
+ var current=modal;
+ if(!isAdmin||!current||current.t!=="publication"||current.loading||!current.preview)return;
+ current.loading=true;current.error="";current.progress="Публикация…";render();
+ try{
+ for(var count=0;count<500;count++){
+ if(modal!==current)return;
+ var result=await publicationRequest("step",current.id,current.preview.version);
+ if(result.done){current.progress="ТЗ опубликовано. Все разделы актуальны.";current.preview.changes=[];current.preview.published=true;current.preview.pending=false;break}
+ current.progress="Обновлён: "+result.updated;if(modal===current)render();
+ if(count===499)throw new Error("Публикация приостановлена. Откройте предпросмотр и продолжите оставшиеся разделы.");
+ }
+ }catch(e){current.error=e.message||"Отправка прервана. Проверьте тему Telegram.";current.progress="";current.preview=null;}
+ current.loading=false;if(modal===current)render();
+}
+function publicationView(){
+ if(!isAdmin)return "";var p=modal.preview;
+ return '<div class="modal gut" data-act="close-bg"><section class="dlg" role="dialog" aria-modal="true" aria-label="Публикация ТЗ в Telegram"><h2>ТЗ в Telegram · тест</h2><p>Только тестовая группа, тема № 2. Подписчикам бота эта публикация не рассылается.</p><p><a href="https://t.me/c/4466460945/2" target="_blank" rel="noopener noreferrer">Открыть тестовую тему ↗</a></p><p class="hint">Отправляется сохранённая версия ТЗ. Вложения представлены ссылками. Изменения существующих сообщений не создают отдельного уведомления.</p>'+
+ (modal.error?'<p role="alert">'+esc(modal.error)+'</p>':'')+
+ '<p role="status">'+esc(modal.progress||(modal.loading?'Загрузка…':''))+'</p>'+
+ (p?(p.pending?'<p role="alert">Предыдущая операция не завершена. При неизвестном результате новой отправки повтор будет заблокирован для защиты от дублей.</p>':'')+(p.changes.length?'<p>Разделов к публикации: '+p.changes.length+'</p>'+p.changes.map(function(x){return '<details><summary>'+esc((x.cancelled?'Отменить: ':x.kind==='edit'?'Обновить: ':'Добавить: ')+x.title)+'</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font:inherit">'+esc(x.text)+'</pre></details>'}).join(''):'<p>Новых изменений нет.</p>'):'')+
+ '<div class="bar"><button class="btn" data-act="close">'+(modal.loading?'Остановить':'Закрыть')+'</button>'+(!modal.loading?'<button class="btn" data-act="tg-preview" data-id="'+esc(modal.id)+'">Проверить изменения</button>':'')+
+ (p&&(p.changes.length||p.pending)?'<button class="btn primary" data-act="tg-send"'+(modal.loading?' disabled':'')+'>'+(p.published?'Обновить в тестовой теме':'Отправить в тестовую тему')+'</button>':'')+'</div></section></div>';
+}
+
 function sheetBar(ev,isEdit){
  if(!isAdmin)return session?'<div class="bar"><a class="btn sm" href="#tech">← Мои ТЗ</a></div>':'';
  var h='<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button><span class="sp"></span>';
  if(isEdit){h+='<label class="eyebrow" for="f-status">Статус</label><select id="f-status" data-f="status">'+STATUSES.map(function(s){return '<option value="'+s.id+'"'+(ev.status===s.id?" selected":"")+'>'+s.name+'</option>'}).join("")+'</select>'}
  else{
+  h+='<button class="btn" data-act="tg-preview" data-id="'+esc(ev.id)+'">ТЗ в Telegram</button>';
   h+='<button class="btn" data-act="copy" data-id="'+esc(ev.id)+'">Ссылка для техников</button>';
   if(isAdmin){h+='<button class="btn" data-act="dup" data-id="'+esc(ev.id)+'">Дублировать</button><button class="btn danger'+(delArmed?" armed":"")+'" data-act="del" data-id="'+esc(ev.id)+'">'+(delArmed?"Точно удалить?":"Удалить")+'</button><button class="btn primary" data-act="edit" data-id="'+esc(ev.id)+'">Редактировать</button>'}
  }
@@ -1255,6 +1296,7 @@ function datalists(){return CATS.map(function(c){return '<datalist id="dl-'+c.id
 /* ---------- modals ---------- */
 function modalView(){
  if(!modal)return "";
+ if(modal.t==="publication")return publicationView();
  if(modal.t==="releases")return isAdmin?releasesView():"";
  var wrap=function(inner,label){return '<div class="modal gut" data-act="close-bg"><div class="dlg" role="dialog" aria-label="'+label+'">'+inner+'</div></div>'};
  if(modal.t==="completeness")return wrap('<h2>Проверьте ТЗ перед сохранением</h2><p>Нажмите на пункт, чтобы перейти к полю.</p><ul class="completeness-list">'+modal.issues.map(function(issue,index){return '<li><button class="linkbtn" data-act="review-field" data-index="'+index+'">'+esc(issue.label)+'</button>'+(issue.required?'<span class="hint">Обязательно для рабочего ТЗ</span>':'<span class="hint">Рекомендуется заполнить</span>')+'</li>'}).join("")+'</ul><div class="bar"><button class="btn" data-act="close">Вернуться</button>'+(modal.issues.some(function(issue){return issue.required})?'':'<button class="btn primary" data-act="review-save">Сохранить с предупреждениями</button>')+'</div>',"Проверка заполнения ТЗ");
@@ -1524,6 +1566,8 @@ app.addEventListener("click",function(e){
    if(!startEdit(cp))break;editing._new=true;dirty=true;location.hash="ev-"+cp.id;break;
   case "del":if(!delArmed){delArmed=true;render();setTimeout(function(){if(delArmed){delArmed=false;render()}},4000);return}
    delArmed=false;deleteEvent(d.id);break;
+  case "tg-preview":publicationPreview(d.id);break;
+  case "tg-send":publicationSend();break;
   case "copy":modal={t:"links",id:d.id};render();break;
   case "copy-one":var cv=d.url;if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(cv).then(function(){toast("Ссылка скопирована")},function(){var ci=document.getElementById(d.inp);if(ci){ci.focus();ci.select()}toast("Выделите ссылку и скопируйте вручную")})}else{var ci2=document.getElementById(d.inp);if(ci2){ci2.focus();ci2.select()}}break;
   case "dept":var evd=route();if(!evd)break;var cur=deptsFor(evd),allOn=cur.length===DEPTS.length;
