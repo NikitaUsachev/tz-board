@@ -54,6 +54,10 @@ async function dispatch() {
     const job=await rpc("tg_claim",{});
     if (!job) break;
     const params={chat_id:job.chat,text:job.message.slice(0,3800)};
+    if (job.kind === "ready") {
+      const hallEnd = params.text.indexOf(" - задачи по ТЗ выполнены");
+      if (hallEnd > 0) params.entities = [{type:"bold", offset:0, length:hallEnd}];
+    }
     if (job.event) params.reply_markup={inline_keyboard:[[{text:"Открыть ТЗ",url:site+"#ev-"+encodeURIComponent(job.event)}]]};
     if (!job.event) params.reply_markup={keyboard:[[{text:"Подписаться на акции"},{text:"Посмотреть акции"}],[{text:"Отписаться от акций"}]],resize_keyboard:true,is_persistent:true,one_time_keyboard:false,input_field_placeholder:"Выберите действие кнопкой"};
     const sent=await telegram("sendMessage",params);
