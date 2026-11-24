@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.24","date":"24 ноября 2026","title":"Отправка только изменений в Telegram","groups":[{"title":"Telegram","items":["После первой отправки ТЗ бот запоминает его содержание. Следующая отправка содержит только добавленные, изменённые и удалённые позиции. Если изменений нет, сообщение не создаётся."]}]},
 {"version":"28.23","date":"24 ноября 2026","title":"Тестовая отправка в Telegram","groups":[{"title":"Техническое задание","items":["В карточке мероприятия появилась кнопка отправки текста ТЗ в тестовую тему Telegram. Рабочая группа не используется."]}]},
 {"version":"28.22","date":"20 ноября 2026","title":"Восстановление загрузки","groups":[{"title":"Надёжность","items":["При задержке загрузки появляется понятное сообщение и кнопка повторной попытки.","Загрузка приложения больше не зависит от внешнего сервера библиотеки.","Ошибки проверки входа больше не оставляют бесконечный экран загрузки."]}]},
 {"version":"28.21","date":"17 ноября 2026","title":"Ширина ТЗ на телефоне","groups":[{"title":"Исправления","items":["Длинные названия и назначения залов переносятся внутри страницы и не растягивают мобильный лист ТЗ."]}]},
@@ -1052,14 +1053,29 @@ var tgTestBusy=false;
 async function sendTelegramTest(id){
  if(!isAdmin||editing||tgTestBusy)return;
  var ev=evById(id);if(!ev||ev.deletedAt)return;
- var lines=["ТЗ: "+(ev.title||"Без названия")];
- [["Дата","date"],["Монтажный день","mountDate"],["Монтаж с","mount"],["Прогоны","rehearsal"],["Начало","start"],["Завершение","end"],["Менеджер","manager"],["Администратор","padmin"],["Инженер","engineer"],["Примечания","notes"]].forEach(function(p){if(ev[p[1]])lines.push(p[0]+": "+ev[p[1]])});
- evHalls(ev).forEach(function(h){lines.push("",h.name+(hallRole(ev,h.id)?" · "+hallRole(ev,h.id):""));CATS.forEach(function(c){var b=blk(ev,h.id,c.id),parts=[];(b.items||[]).forEach(function(i){if(i.name)parts.push("• "+itemLabel(i)+(i.note?" — "+i.note:""))});var stage=stageSummary(b);if(stage)parts.push(stage);if(b.chief&&personLine(b.chief))parts.push("Бригадир: "+personLine(b.chief));staffOf(b).forEach(function(p){if(personLine(p))parts.push(personLine(p))});if(b.note)parts.push(b.note);(b.files||[]).forEach(function(x){parts.push("Файл: "+x.name)});(b.links||[]).forEach(function(x){parts.push((x.title||"Ссылка")+": "+x.url)});if(parts.length)lines.push(c.name+":",...parts)})});
- var text=lines.join("\n");
- if(text.length>3780){toast("ТЗ длиннее лимита тестовой отправки (3780 символов).");return}
+ var records=[];
+ function add(key,scope,label,value){if(value===undefined||value===null||!String(value).trim())return;records.push({key:JSON.stringify(key),scope:scope,text:(label?label+": ":"")+String(value).trim()})}
+ add(["title"],"Общие данные","Название",ev.title||"Без названия");
+ [["Дата","date"],["Монтажный день","mountDate"],["Монтаж с","mount"],["Прогоны","rehearsal"],["День прогонов","rehearsalDay"],["Начало","start"],["Завершение","end"],["Менеджер","manager"],["Администратор","padmin"],["Инженер","engineer"],["Примечания","notes"]].forEach(function(p){add(["head",p[1]],"Общие данные",p[0],p[1]==="rehearsalDay"?(ev.rehearsal?(ev.rehearsalDay==="mount"?"Монтажный день":"День мероприятия"):""):ev[p[1]])});
+ add(["status"],"Общие данные","Статус",stName(ev.status));
+ (ev.soundchecks||[]).forEach(function(x,i){add(["soundcheck",x.id||i],"Общие данные","Саундчек",[x.name,x.date,x.time].filter(Boolean).join(" · "))});
+ DOCS.forEach(function(d){((ev.docs||{})[d.id]||[]).forEach(function(x,i){add(["doc",d.id,x.id||i],"Документы",d.name,x.name)})});
+ evHalls(ev).forEach(function(h){
+  add(["hall",h.id],"Залы","Зал",h.name+(hallRole(ev,h.id)?" · "+hallRole(ev,h.id):""));
+  [["hallFiles","Схема зала"],["hallPowerFiles","Схема электропитания"]].forEach(function(p){((ev[p[0]]||{})[h.id]||[]).forEach(function(x,i){add([h.id,p[0],x.id||i],h.name,p[1],x.name)})});
+  CATS.forEach(function(c){var b=blk(ev,h.id,c.id),scope=h.name+" · "+c.name,k=[h.id,c.id];
+   (b.items||[]).forEach(function(i,n){if(i.name)add(k.concat(["item",i.id||n]),scope,"",itemLabel(i)+(i.note?" — "+i.note:""))});
+   stageSpecs(b).forEach(function(sp,n){add(k.concat(["stage",sp.id||n]),scope,"Сцена",[sp.name,sp.location,specStr(sp)].filter(Boolean).join(" · "))});
+   if(b.chief)add(k.concat("chief"),scope,"Бригадир",personLine(b.chief));
+   staffOf(b).forEach(function(p,n){add(k.concat(["staff",p.id||n]),scope,"Персонал",personLine(p))});
+   add(k.concat("note"),scope,"Примечание",b.note);
+   (b.files||[]).forEach(function(x,n){add(k.concat(["file",x.id||n]),scope,"Файл",x.name)});
+   (b.links||[]).forEach(function(x,n){add(k.concat(["link",x.id||n]),scope,x.title||"Ссылка",x.url)});
+  });
+ });
  if(!confirm("Отправить ТЗ в тестовую тему Telegram? Рабочая группа не используется."))return;
  tgTestBusy=true;render();
- try{var r=await sb.functions.invoke("tz-telegram-test",{body:{event:id,text:text}});if(r.error)throw r.error;if(!r.data?.ok)throw new Error(r.data?.error||"Отправка не подтверждена");toast("ТЗ отправлено в тестовую тему Telegram")}catch(e){toast("Не отправлено: "+(e.message||"Ошибка связи"))}finally{tgTestBusy=false;render()}
+ try{var r=await sb.functions.invoke("tz-telegram-test",{body:{event:id,version:Number(versions[id]),title:ev.title||"Без названия",records:records}});if(r.error)throw r.error;if(!r.data?.ok)throw new Error(r.data?.error||"Отправка не подтверждена");toast(r.data.unchanged?"Нет новых изменений. Сообщение не отправлено":r.data.changed?"Изменения отправлены в Telegram":"ТЗ отправлено в тестовую тему Telegram")}catch(e){toast("Не отправлено: "+(e.message||"Ошибка связи"))}finally{tgTestBusy=false;render()}
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return session?'<div class="bar"><a class="btn sm" href="#tech">← Мои ТЗ</a></div>':'';
