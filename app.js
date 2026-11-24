@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.23","date":"24 ноября 2026","title":"Тестовая отправка в Telegram","groups":[{"title":"Техническое задание","items":["В карточке мероприятия появилась кнопка отправки текста ТЗ в тестовую тему Telegram. Рабочая группа не используется."]}]},
 {"version":"28.22","date":"20 ноября 2026","title":"Восстановление загрузки","groups":[{"title":"Надёжность","items":["При задержке загрузки появляется понятное сообщение и кнопка повторной попытки.","Загрузка приложения больше не зависит от внешнего сервера библиотеки.","Ошибки проверки входа больше не оставляют бесконечный экран загрузки."]}]},
 {"version":"28.21","date":"17 ноября 2026","title":"Ширина ТЗ на телефоне","groups":[{"title":"Исправления","items":["Длинные названия и назначения залов переносятся внутри страницы и не растягивают мобильный лист ТЗ."]}]},
 {"version":"28.20","date":"17 ноября 2026","title":"Файлы на телефоне","groups":[{"title":"Исправления","items":["Длинные названия файлов переносятся внутри карточки. Метка Новое, размер и кнопки Открыть / Скачать больше не выходят за её границы."]}]},
@@ -1047,11 +1048,25 @@ function sheetView(id){
  var depts=deptsFor(ev.id);curDiff=techDiff(ev);flagTitle(!!curDiff);if(curDiff)storeMarks(ev,curDiff);curMarks=activeMarks(ev);
  return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+(!session?'<p class="hint">Режим просмотра. Войдите как техник, чтобы ставить отметки.</p>':'')+'<div id="telegram-link">'+telegramLink(ev)+'</div>'+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
+var tgTestBusy=false;
+async function sendTelegramTest(id){
+ if(!isAdmin||editing||tgTestBusy)return;
+ var ev=evById(id);if(!ev||ev.deletedAt)return;
+ var lines=["ТЗ: "+(ev.title||"Без названия")];
+ [["Дата","date"],["Монтажный день","mountDate"],["Монтаж с","mount"],["Прогоны","rehearsal"],["Начало","start"],["Завершение","end"],["Менеджер","manager"],["Администратор","padmin"],["Инженер","engineer"],["Примечания","notes"]].forEach(function(p){if(ev[p[1]])lines.push(p[0]+": "+ev[p[1]])});
+ evHalls(ev).forEach(function(h){lines.push("",h.name+(hallRole(ev,h.id)?" · "+hallRole(ev,h.id):""));CATS.forEach(function(c){var b=blk(ev,h.id,c.id),parts=[];(b.items||[]).forEach(function(i){if(i.name)parts.push("• "+itemLabel(i)+(i.note?" — "+i.note:""))});var stage=stageSummary(b);if(stage)parts.push(stage);if(b.chief&&personLine(b.chief))parts.push("Бригадир: "+personLine(b.chief));staffOf(b).forEach(function(p){if(personLine(p))parts.push(personLine(p))});if(b.note)parts.push(b.note);(b.files||[]).forEach(function(x){parts.push("Файл: "+x.name)});(b.links||[]).forEach(function(x){parts.push((x.title||"Ссылка")+": "+x.url)});if(parts.length)lines.push(c.name+":",...parts)})});
+ var text=lines.join("\n");
+ if(text.length>3780){toast("ТЗ длиннее лимита тестовой отправки (3780 символов).");return}
+ if(!confirm("Отправить ТЗ в тестовую тему Telegram? Рабочая группа не используется."))return;
+ tgTestBusy=true;render();
+ try{var r=await sb.functions.invoke("tz-telegram-test",{body:{event:id,text:text}});if(r.error)throw r.error;if(!r.data?.ok)throw new Error(r.data?.error||"Отправка не подтверждена");toast("ТЗ отправлено в тестовую тему Telegram")}catch(e){toast("Не отправлено: "+(e.message||"Ошибка связи"))}finally{tgTestBusy=false;render()}
+}
 function sheetBar(ev,isEdit){
  if(!isAdmin)return session?'<div class="bar"><a class="btn sm" href="#tech">← Мои ТЗ</a></div>':'';
  var h='<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button><span class="sp"></span>';
  if(isEdit){h+='<label class="eyebrow" for="f-status">Статус</label><select id="f-status" data-f="status">'+STATUSES.map(function(s){return '<option value="'+s.id+'"'+(ev.status===s.id?" selected":"")+'>'+s.name+'</option>'}).join("")+'</select>'}
  else{
+  h+='<button class="btn" data-act="tg-test" data-id="'+esc(ev.id)+'"'+(tgTestBusy?" disabled":"")+'>'+(tgTestBusy?"Отправка…":"Отправить в Telegram (тест)") +'</button>';
   h+='<button class="btn" data-act="copy" data-id="'+esc(ev.id)+'">Ссылка для техников</button>';
   if(isAdmin){h+='<button class="btn" data-act="dup" data-id="'+esc(ev.id)+'">Дублировать</button><button class="btn danger'+(delArmed?" armed":"")+'" data-act="del" data-id="'+esc(ev.id)+'">'+(delArmed?"Точно удалить?":"Удалить")+'</button><button class="btn primary" data-act="edit" data-id="'+esc(ev.id)+'">Редактировать</button>'}
  }
@@ -1483,6 +1498,7 @@ app.addEventListener("click",function(e){
   case "back":
    if(editing&&dirty&&!exitArmed){exitArmed=true;render();return}
    if(leaveEdit(true)){delArmed=false;go(null)}break;
+  case "tg-test":sendTelegramTest(d.id);break;
   case "tg-ready":sendHallReady(t,d.h);break;
   case "retry-start":startSession();break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
