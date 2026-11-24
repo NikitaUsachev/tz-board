@@ -81,7 +81,7 @@ const {boot,tick}=require('./helpers/app-harness.cjs');
  assert.equal(signup.p.options.emailRedirectTo,'https://example.test/?tech_return=ev-E');
  assert.match(t.app.innerHTML,/Проверьте почту/);
  assert.doesNotMatch(t.app.innerHTML,/Получать изменения в Telegram/);
- const tg=await boot(false,false,true);assert.match(tg.app.innerHTML,/example_tz_bot\?start=E/);assert.doesNotMatch(tg.app.innerHTML,/Зал готов/);assert.match(tg.app.innerHTML,/Осталось отметить: Звук — 1/);
+ const tg=await boot(false,false,true);assert.doesNotMatch(tg.app.innerHTML,/Получать изменения в Telegram/);assert.doesNotMatch(tg.app.innerHTML,/Зал готов/);assert.match(tg.app.innerHTML,/Осталось отметить: Звук — 1/);
  const completed=await boot(false,false,true,[{item_id:'item',by_name:'Имя'},{item_id:'arrival:item',by_name:'Имя'}]);assert.doesNotMatch(completed.app.innerHTML,/Зал готов/);assert.match(completed.app.innerHTML,/data-done="E\|item" checked disabled/);
  const techSession={user:{id:'tech',email:'tech@example.com',user_metadata:{technician_name:'Техник'}}};
  const signOutOptions={getSession:async()=>({data:{session:techSession}}),role:false};
