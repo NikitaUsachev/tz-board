@@ -13,7 +13,7 @@ const {boot,tick}=require('../helpers/app-harness.cjs');
  for(const engine of [chromium,webkit]){const browser=await engine.launch({headless:true});for(const width of [320,390,430,1440]){
  const page=await browser.newPage({viewport:{width,height:850},isMobile:width<500});
  for(const html of [sheet,preview]){await page.setContent('<meta name="viewport" content="width=device-width,initial-scale=1">'+html);for(const css of ['app.css','light-sheet.css'])await page.addStyleTag({content:fs.readFileSync(css,'utf8')});
- if(html===preview)await page.locator('details').evaluate(e=>e.open=true);
+ if(html===preview)await page.locator('.dlg details').evaluate(e=>e.open=true);
  for(const theme of ['dark','light']){await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);assert.equal(overflow,false,engine.name()+' '+width+' '+theme);
  const controls=await page.locator(html===preview?'.dlg button':'.event-sheet .bar button').all();for(const b of controls){const r=await b.boundingBox();if(r)assert.ok(r.x>=-1&&r.x+r.width<=width+1,'button overflow '+JSON.stringify(r));}}

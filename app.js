@@ -1083,7 +1083,7 @@ function publicationView(){
  (modal.error?'<p role="alert">'+esc(modal.error)+'</p>':'')+
  '<p role="status">'+esc(modal.progress||(modal.loading?'Загрузка…':''))+'</p>'+
  (p?(p.pending?'<p role="alert">Предыдущая операция не завершена. При неизвестном результате новой отправки повтор будет заблокирован для защиты от дублей.</p>':'')+(p.changes.length?'<p>Разделов к публикации: '+p.changes.length+'</p>'+p.changes.map(function(x){return '<details><summary>'+esc((x.cancelled?'Отменить: ':x.kind==='edit'?'Обновить: ':'Добавить: ')+x.title)+'</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font:inherit">'+esc(x.text)+'</pre></details>'}).join(''):'<p>Новых изменений нет.</p>'):'')+
- '<div class="bar"><button class="btn" data-act="close">'+(modal.loading?'Остановить после текущего сообщения':'Закрыть')+'</button>'+(!modal.loading?'<button class="btn" data-act="tg-preview" data-id="'+esc(modal.id)+'">Проверить изменения</button>':'')+
+ '<div class="bar"><button class="btn" data-act="close">'+(modal.loading?'Остановить':'Закрыть')+'</button>'+(!modal.loading?'<button class="btn" data-act="tg-preview" data-id="'+esc(modal.id)+'">Проверить изменения</button>':'')+
  (p&&(p.changes.length||p.pending)?'<button class="btn primary" data-act="tg-send"'+(modal.loading?' disabled':'')+'>'+(p.published?'Обновить в тестовой теме':'Отправить в тестовую тему')+'</button>':'')+'</div></section></div>';
 }
 
@@ -1092,7 +1092,7 @@ function sheetBar(ev,isEdit){
  var h='<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button><span class="sp"></span>';
  if(isEdit){h+='<label class="eyebrow" for="f-status">Статус</label><select id="f-status" data-f="status">'+STATUSES.map(function(s){return '<option value="'+s.id+'"'+(ev.status===s.id?" selected":"")+'>'+s.name+'</option>'}).join("")+'</select>'}
  else{
-  h+='<button class="btn" data-act="tg-preview" data-id="'+esc(ev.id)+'">Отправить / обновить ТЗ в Telegram</button>';
+  h+='<button class="btn" data-act="tg-preview" data-id="'+esc(ev.id)+'">ТЗ в Telegram</button>';
   h+='<button class="btn" data-act="copy" data-id="'+esc(ev.id)+'">Ссылка для техников</button>';
   if(isAdmin){h+='<button class="btn" data-act="dup" data-id="'+esc(ev.id)+'">Дублировать</button><button class="btn danger'+(delArmed?" armed":"")+'" data-act="del" data-id="'+esc(ev.id)+'">'+(delArmed?"Точно удалить?":"Удалить")+'</button><button class="btn primary" data-act="edit" data-id="'+esc(ev.id)+'">Редактировать</button>'}
  }
