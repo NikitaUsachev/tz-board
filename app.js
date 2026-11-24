@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.26","date":"24 ноября 2026","title":"Темы Telegram для мероприятий","groups":[{"title":"Telegram","items":["Администраторы могут сохранить или изменить ссылку на тему Telegram в карточке каждого мероприятия. Отправка без настроенной темы запрещена. История изменений ведётся отдельно для каждой темы."]}]},
 {"version":"28.25","date":"24 ноября 2026","title":"Краткие изменения в Telegram","groups":[{"title":"Telegram","items":["В сообщении только изменённые позиции с новым количеством, сгруппированные по залу и отделу. Комментарии выводятся отдельной строкой. Удалённые позиции обозначаются отдельно."]}]},
 {"version":"28.24","date":"24 ноября 2026","title":"Отправка только изменений в Telegram","groups":[{"title":"Telegram","items":["После первой отправки ТЗ бот запоминает его содержание. Следующая отправка содержит только добавленные, изменённые и удалённые позиции. Если изменений нет, сообщение не создаётся."]}]},
 {"version":"28.23","date":"24 ноября 2026","title":"Тестовая отправка в Telegram","groups":[{"title":"Техническое задание","items":["В карточке мероприятия появилась кнопка отправки текста ТЗ в тестовую тему Telegram. Рабочая группа не используется."]}]},
@@ -1051,6 +1052,24 @@ function sheetView(id){
  return topBar()+'<div class="sheet gut event-sheet">'+sheetBar(ev,isEdit)+(isAdmin?changesView(ev,curDiff,depts):"")+headView(ev,isEdit)+(!session?'<p class="hint">Режим просмотра. Войдите как техник, чтобы ставить отметки.</p>':'')+'<div id="telegram-link">'+telegramLink(ev)+'</div>'+deptBar(ev,depts)+hallsView(ev,isEdit,depts)+'</div>';
 }
 var tgTestBusy=false;
+async function telegramTopicRequest(body){
+ var r=await sb.functions.invoke("tz-telegram-test",{body:body});
+ if(r.error)throw r.error;if(!r.data?.ok)throw new Error(r.data?.error||"Операция не подтверждена");return r.data;
+}
+async function configureTelegramTopic(id){
+ if(!isAdmin||editing||tgTestBusy)return;
+ tgTestBusy=true;render();
+ try{
+  var current=await telegramTopicRequest({action:"get",event:id});
+  var link=prompt("Вставьте ссылку на тему Telegram (t.me/c/…). Пустое поле удаляет привязку. Для отмены нажмите Отмена.",current.link||"");
+  if(link===null)return;link=link.trim();
+  if(!link&&current.link&&!confirm("Удалить привязку темы? История отправок сохранится."))return;
+  if(!link&&!current.link)return;
+  var result=await telegramTopicRequest({action:"set",event:id,link:link,expected:current.link});
+  toast(result.link?"Тема Telegram сохранена":"Привязка темы удалена");
+ }catch(e){toast("Telegram: "+(e.message||"Ошибка связи"))}finally{tgTestBusy=false;render()}
+}
+
 async function sendTelegramTest(id){
  if(!isAdmin||editing||tgTestBusy)return;
  var ev=evById(id);if(!ev||ev.deletedAt)return;
@@ -1074,16 +1093,22 @@ async function sendTelegramTest(id){
    (b.links||[]).forEach(function(x,n){add(k.concat(["link",x.id||n]),scope,x.title||"Ссылка",x.url)});
   });
  });
- if(!confirm("Отправить ТЗ в тестовую тему Telegram? Рабочая группа не используется."))return;
  tgTestBusy=true;render();
- try{var r=await sb.functions.invoke("tz-telegram-test",{body:{event:id,version:Number(versions[id]),title:ev.title||"Без названия",records:records}});if(r.error)throw r.error;if(!r.data?.ok)throw new Error(r.data?.error||"Отправка не подтверждена");toast(r.data.unchanged?"Нет новых изменений. Сообщение не отправлено":r.data.changed?"Изменения отправлены в Telegram":"ТЗ отправлено в тестовую тему Telegram")}catch(e){toast("Не отправлено: "+(e.message||"Ошибка связи"))}finally{tgTestBusy=false;render()}
+ try{
+  var topic=await telegramTopicRequest({action:"get",event:id});
+  if(!topic.link){toast("Сначала настройте тему Telegram для мероприятия");return}
+  if(!confirm("Отправить ТЗ или изменения в тему Telegram?\n"+topic.link))return;
+  var result=await telegramTopicRequest({action:"send",event:id,link:topic.link,version:Number(versions[id]),title:ev.title||"Без названия",records:records});
+  toast(result.unchanged?"Нет новых изменений. Сообщение не отправлено":result.changed?"Изменения отправлены в Telegram":"ТЗ отправлено в Telegram");
+ }catch(e){toast("Не отправлено: "+(e.message||"Ошибка связи"))}finally{tgTestBusy=false;render()}
 }
 function sheetBar(ev,isEdit){
  if(!isAdmin)return session?'<div class="bar"><a class="btn sm" href="#tech">← Мои ТЗ</a></div>':'';
  var h='<div class="bar"><button class="btn" data-act="back">← Все ТЗ</button><span class="sp"></span>';
  if(isEdit){h+='<label class="eyebrow" for="f-status">Статус</label><select id="f-status" data-f="status">'+STATUSES.map(function(s){return '<option value="'+s.id+'"'+(ev.status===s.id?" selected":"")+'>'+s.name+'</option>'}).join("")+'</select>'}
  else{
-  h+='<button class="btn" data-act="tg-test" data-id="'+esc(ev.id)+'"'+(tgTestBusy?" disabled":"")+'>'+(tgTestBusy?"Отправка…":"Отправить в Telegram (тест)") +'</button>';
+  h+='<button class="btn" data-act="tg-topic" data-id="'+esc(ev.id)+'"'+(tgTestBusy?" disabled":"")+'>Настроить тему Telegram</button>';
+  h+='<button class="btn" data-act="tg-test" data-id="'+esc(ev.id)+'"'+(tgTestBusy?" disabled":"")+'>'+(tgTestBusy?"Отправка…":"Отправить в Telegram") +'</button>';
   h+='<button class="btn" data-act="copy" data-id="'+esc(ev.id)+'">Ссылка для техников</button>';
   if(isAdmin){h+='<button class="btn" data-act="dup" data-id="'+esc(ev.id)+'">Дублировать</button><button class="btn danger'+(delArmed?" armed":"")+'" data-act="del" data-id="'+esc(ev.id)+'">'+(delArmed?"Точно удалить?":"Удалить")+'</button><button class="btn primary" data-act="edit" data-id="'+esc(ev.id)+'">Редактировать</button>'}
  }
@@ -1515,6 +1540,7 @@ app.addEventListener("click",function(e){
   case "back":
    if(editing&&dirty&&!exitArmed){exitArmed=true;render();return}
    if(leaveEdit(true)){delArmed=false;go(null)}break;
+  case "tg-topic":configureTelegramTopic(d.id);break;
   case "tg-test":sendTelegramTest(d.id);break;
   case "tg-ready":sendHallReady(t,d.h);break;
   case "retry-start":startSession();break;
