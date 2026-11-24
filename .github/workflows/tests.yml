@@ -28,6 +28,8 @@ jobs:
         with:
           node-version: '24'
       - run: npm install --no-save --package-lock=false playwright@1.58.2
+      - name: Telegram publication preview and mobile layout
+        run: node tests/browser/publication.cjs
       - name: Startup failures and recovery
         run: node tests/browser/startup.cjs
       - name: Block confirmations in Chromium
