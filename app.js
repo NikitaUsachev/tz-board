@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.25","date":"24 ноября 2026","title":"Краткие изменения в Telegram","groups":[{"title":"Telegram","items":["В сообщении только изменённые позиции с новым количеством, сгруппированные по залу и отделу. Комментарии выводятся отдельной строкой. Удалённые позиции обозначаются отдельно."]}]},
 {"version":"28.24","date":"24 ноября 2026","title":"Отправка только изменений в Telegram","groups":[{"title":"Telegram","items":["После первой отправки ТЗ бот запоминает его содержание. Следующая отправка содержит только добавленные, изменённые и удалённые позиции. Если изменений нет, сообщение не создаётся."]}]},
 {"version":"28.23","date":"24 ноября 2026","title":"Тестовая отправка в Telegram","groups":[{"title":"Техническое задание","items":["В карточке мероприятия появилась кнопка отправки текста ТЗ в тестовую тему Telegram. Рабочая группа не используется."]}]},
 {"version":"28.22","date":"20 ноября 2026","title":"Восстановление загрузки","groups":[{"title":"Надёжность","items":["При задержке загрузки появляется понятное сообщение и кнопка повторной попытки.","Загрузка приложения больше не зависит от внешнего сервера библиотеки.","Ошибки проверки входа больше не оставляют бесконечный экран загрузки."]}]},
@@ -1064,7 +1065,7 @@ async function sendTelegramTest(id){
   add(["hall",h.id],"Залы","Зал",h.name+(hallRole(ev,h.id)?" · "+hallRole(ev,h.id):""));
   [["hallFiles","Схема зала"],["hallPowerFiles","Схема электропитания"]].forEach(function(p){((ev[p[0]]||{})[h.id]||[]).forEach(function(x,i){add([h.id,p[0],x.id||i],h.name,p[1],x.name)})});
   CATS.forEach(function(c){var b=blk(ev,h.id,c.id),scope=h.name+" · "+c.name,k=[h.id,c.id];
-   (b.items||[]).forEach(function(i,n){if(i.name)add(k.concat(["item",i.id||n]),scope,"",itemLabel(i)+(i.note?" — "+i.note:""))});
+   (b.items||[]).forEach(function(i,n){if(i.name){var len=records.length;add(k.concat(["item",i.id||n]),scope,"",itemLabel(i)+(i.note?" — "+i.note:""));if(records.length>len&&i.note)records[records.length-1].comment=String(i.note).trim()}});
    stageSpecs(b).forEach(function(sp,n){add(k.concat(["stage",sp.id||n]),scope,"Сцена",[sp.name,sp.location,specStr(sp)].filter(Boolean).join(" · "))});
    if(b.chief)add(k.concat("chief"),scope,"Бригадир",personLine(b.chief));
    staffOf(b).forEach(function(p,n){add(k.concat(["staff",p.id||n]),scope,"Персонал",personLine(p))});
