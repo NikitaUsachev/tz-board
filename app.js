@@ -462,10 +462,7 @@ function refreshTelegramView(id){
  if(slot.innerHTML!==html)slot.innerHTML=html;
  paintChecks(id);
 }
-function telegramLink(ev){
- if(isAdmin||telegramEvent?.id!==ev.id||!/^[A-Za-z0-9_-]{1,64}$/.test(ev.id))return "";
- return '<p><a class="btn" target="_blank" rel="noopener noreferrer" href="https://t.me/'+telegramEvent.username+'?start='+encodeURIComponent(ev.id)+'">Получать изменения в Telegram</a></p>';
-}
+function telegramLink(){return ""}
 function hallProgress(ev,hall){
  var blocks=ev&&ev.blocks&&ev.blocks[hall],total=0,remaining=[];
  CATS.forEach(function(category){
