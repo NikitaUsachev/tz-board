@@ -488,3 +488,8 @@ body{--bg:#f8f8f6;--ink:#20211f;--muted:#565c55;--line:#c8cbc5;--hero:#dfebfd;--
 #profile-form{display:grid;gap:16px}
 #profile-form>.btn{justify-self:start}
 
+
+/* Keep the safe-area decoration from intercepting taps in iOS standalone. */
+body::before{pointer-events:none}
+[data-act="account"],[data-act="tech-profile"],[data-act="logout"]{touch-action:manipulation;min-height:44px}
+@media (display-mode:standalone){.modal{padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);-webkit-overflow-scrolling:touch}.modal .dlg{flex-shrink:0;max-width:100%}}
