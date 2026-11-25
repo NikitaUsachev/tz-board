@@ -21,6 +21,7 @@ var editingOrig=[], editing=null, editingVersion=null, dirty=false, query="", pi
 var app=document.getElementById("app");
 
 var RELEASES=[
+{"version":"28.27","date":"25 ноября 2026","title":"Исправление профиля на iPhone","groups":[{"title":"Личный кабинет","items":["Профиль техника открывается также на странице Мои ТЗ. Убрано автоматическое открытие клавиатуры при входе в профиль. Улучшена доступность кнопок профиля и выхода на iPhone."]}]},
 {"version":"28.26","date":"24 ноября 2026","title":"Темы Telegram для мероприятий","groups":[{"title":"Telegram","items":["Администраторы могут сохранить или изменить ссылку на тему Telegram в карточке каждого мероприятия. Отправка без настроенной темы запрещена. История изменений ведётся отдельно для каждой темы."]}]},
 {"version":"28.25","date":"24 ноября 2026","title":"Краткие изменения в Telegram","groups":[{"title":"Telegram","items":["В сообщении только изменённые позиции с новым количеством, сгруппированные по залу и отделу. Комментарии выводятся отдельной строкой. Удалённые позиции обозначаются отдельно."]}]},
 {"version":"28.24","date":"24 ноября 2026","title":"Отправка только изменений в Telegram","groups":[{"title":"Telegram","items":["После первой отправки ТЗ бот запоминает его содержание. Следующая отправка содержит только добавленные, изменённые и удалённые позиции. Если изменений нет, сообщение не создаётся."]}]},
@@ -833,7 +834,7 @@ function topBar(){
  var mode=isAdmin?'<span class="mode admin">Администратор</span>':'';
  var onBoard=!route()&&isAdmin;
  var name=isAdmin?accountLabel():"";
- var auth=isAdmin?'<button class="btn ghost sm'+(onBoard?' admin-board-profile':'')+'" data-act="account" title="'+esc(myEmail())+'"'+(onBoard?' aria-label="Профиль: '+esc(name)+'"':'')+'>'+
+ var auth=isAdmin?'<button type="button" class="btn ghost sm'+(onBoard?' admin-board-profile':'')+'" data-act="account" title="'+esc(myEmail())+'"'+(onBoard?' aria-label="Профиль: '+esc(name)+'"':'')+'>'+
   (onBoard?'<span class="admin-board-profile-title">Профиль</span><span class="admin-board-profile-name">'+esc(name)+'</span>':esc(name))+'</button>':'';
  var technician=!!((route()||technicianHome())&&session&&!isAdmin);
  if((route()||technicianHome())&&!isAdmin){
@@ -1543,7 +1544,7 @@ app.addEventListener("click",function(e){
   case "retry-start":startSession();break;
   case "retry":loaded=false;render();if(isAdmin)loadAll();else loadTech(route());break;
   case "auth-tab":setTab(d.tab);break;
-  case "tech-profile":if(route()&&session&&!isAdmin){modal={t:"me",profile:true};render();document.getElementById("me-in")?.focus()}break;
+  case "tech-profile":if((route()||technicianHome())&&session&&!isAdmin){modal={t:"me",profile:true};render()}break;
   case "tech-login":if((route()||technicianHome())&&!isAdmin)openTechnician();break;
   case "tech-list-retry":loadTechnicianEvents();break;
   case "tech-view":technicianView=d.view;ls.set("tz-tech-view",d.view);render();break;
@@ -1554,7 +1555,7 @@ app.addEventListener("click",function(e){
   case "google":auth.err="";sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:homeLink()}}).then(function(r){if(r.error){auth.err=authErr(r.error);render()}});break;
   case "releases":if(isAdmin){markReleaseRead();modal={t:"releases"};render();var rc=document.getElementById("release-close");if(rc)rc.focus()}break;
   case "recheck":checkAdmin();break;
-  case "account":if(isAdmin){modal=Object.assign({t:"account"},accountProfile());render()}break;
+  case "account":if(isAdmin&&session){modal=Object.assign({t:"account"},accountProfile());render()}break;
   case "logout":signOut();break;
   case "new":var ev=newEvent(d.st);if(!startEdit(ev))break;editing._new=true;location.hash="ev-"+ev.id;break;
   case "edit":var x=evById(d.id);if(x&&startEdit(x)){render()}break;
